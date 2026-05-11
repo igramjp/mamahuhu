@@ -1,0 +1,46 @@
+name: Daily Scrape
+
+on:
+  schedule:
+    # 土日の翌朝5時JST(=日曜・月曜の5時JST)に実行
+    # SAT 20:00 UTC = 日曜5時JST → 土曜分取得
+    # SUN 20:00 UTC = 月曜5時JST → 日曜分取得
+    - cron: '0 20 * * SAT,SUN'
+  workflow_dispatch:  # 月曜祝日開催等は手動実行
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run scraper
+        run: |
+          python scraper/scrape.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/
+          if git diff --staged --quiet; then
+            echo "変更なし"
+          else
+            git commit -m "data: $(TZ=Asia/Tokyo date +%Y-%m-%d) auto-update"
+            git push
+          fi

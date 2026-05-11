@@ -1,0 +1,4 @@
+# AdSenseの審査・運用に必要なads.txtです。
+# AdSense承認後、下のXXXXXを自分のPublisher IDに置換してください。
+# 形式: google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
+google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0

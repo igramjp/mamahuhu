@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>なんなの | 马马虎虎</title>
+<meta name="description" content="马马虎虎(マーマーフーフー)は、JRA結果のゆるい集計サイトです。中国故事「马马虎虎」の由来と、サイトの楽しみ方。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&family=Klee+One:wght@400;600&family=Zen+Maru+Gothic:wght@400;500;700&family=Hachi+Maru+Pop&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">
+      <h1 class="brand-name"><a href="index.html"><span class="brand-ma">马马</span><span class="brand-hu">虎虎</span></a></h1>
+      <p class="brand-tag">マーマーフーフー — JRA結果のゆるい集計</p>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">きょうの</a>
+      <a href="about.html">なんなの</a>
+      <a href="privacy.html">プライバシー</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  <article class="prose">
+    <h2 class="section-head">なんなの、このサイト</h2>
+
+    <p><strong>马马虎虎(マーマーフーフー)</strong>は、JRA中央競馬の結果をゆるく集計する個人サイトです。</p>
+    <p>馬場の癖、脚質の偏り、人気以上に走った騎手のランキング——そういう「<em>その日の傾向</em>」を毎朝まとめて出します。次の開催に向けて、なんとなく眺めるためのサイトです。</p>
+
+    <h3>名前の由来</h3>
+    <p>「<strong>马马虎虎</strong>」は中国の慣用句で、意味は「<em>まあまあ、適当、いい加減</em>」。馬と虎を見分けられずに描いた、いい加減な画家の故事が由来です。</p>
+    <p>世の中には「100%的中!」「極秘情報!」と煽る競馬予想サイトがいっぱいあります。うちは逆です。<strong>ガチ予想はしません</strong>。数字を集計して並べるだけ。馬か虎かを見極めるのはあなた、というスタンスです。</p>
+
+    <h3>なにを集計してるの</h3>
+    <ul>
+      <li><strong>枠バイアス</strong> — 内(枠1〜4)と外(枠5〜8)で複勝率はどう違ったか</li>
+      <li><strong>脚質バイアス</strong> — 逃げ先行と差し追込、どっちが決まったか</li>
+      <li><strong>好調騎手</strong> — 複勝圏内(1〜3着)で人気差+5以上のサプライズを記録した騎手。人気差 = 人気 − 着順</li>
+    </ul>
+    <p>芝とダートは分けて集計してます。混ぜると全然違う傾向のものを足し算しちゃうので。画面上で芝/ダートをボタンで切り替えられます。</p>
+    <p>枠も脚質も、もとは3〜4分類が定番ですが、1日6レース(芝orダ各々)だとサンプルが足りずノイズだらけになるので、思い切って2分類にしてます。「<em>まあまあ</em>」のサイトらしい振り切り方です。</p>
+
+    <h3>使い方のコツ</h3>
+    <p>あくまで「<em>その日</em>」の傾向です。馬場のバイアスは日によって、なんなら同じ日でも前半と後半でガラッと変わります。「土曜はこうだった、日曜も同じとは限らない」くらいで眺めるのが一番です。</p>
+    <p>馬場バイアスは<strong>翌日の同場・近い距離の平場</strong>あたりが効くレンジ。重賞や長距離G1には基本届きません。</p>
+    <p>好調騎手のほうは、距離・クラスにあまり依存せず<strong>翌日に持ち越しやすい</strong>のがウマい使い方。<em>前日穴を開けた騎手は翌日もマーク</em>、という馬券派の感覚に近いものをデータで自動抽出してます。</p>
+    <p>「最大人気差」は数字が大きいほど予想外の好走。1鞍だけのホームラン派と、騎乗数が多くて安定してる派が混ざります。<em>騎乗</em>と<em>勝・複</em>の数字で読み分けてください。</p>
+
+    <h3>ご注意</h3>
+    <p>分析結果は管理人の独自集計です。馬券の的中を保証するものではありません。投票は20歳以上、自己責任でお願いします。</p>
+  </article>
+</main>
+
+<footer class="site-footer">
+  <p class="copyright">&copy; <span id="year"></span> 马马虎虎</p>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

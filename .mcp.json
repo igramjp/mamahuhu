@@ -1,0 +1,8 @@
+{
+    "mcpServers": {
+        "supercollider": {
+            "type": "sse",
+            "url": "http://localhost:42273/sse"
+        }
+    }
+}

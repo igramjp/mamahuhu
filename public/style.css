@@ -1,0 +1,675 @@
+/* ========================================
+   马马虎虎 - yurui style
+   生成り×茶墨×朱と黄土、手描き感
+   ======================================== */
+
+:root {
+  --bg: #FAF3E0;
+  --bg-warm: #F5E8C8;
+  --paper: #FFFAEC;
+  --ink: #3A2A1A;
+  --ink-soft: #6B5841;
+  --rule: #D4B88A;
+  --rule-faint: #E8D6A8;
+
+  --horse: #D14F3C;
+  /* 朱赤 - 馬 */
+  --tiger: #DBA53A;
+  /* 黄土 - 虎 */
+  --green: #7A9456;
+  /* 抹茶 */
+  --pink: #E8A0A8;
+
+  --display: "Yusei Magic", "Klee One", "Hachi Maru Pop", serif;
+  --gothic: "Zen Maru Gothic", "M PLUS Rounded 1c", "Hiragino Sans", sans-serif;
+  --brush: "Klee One", "Yusei Magic", serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--gothic);
+  font-size: 16px;
+  line-height: 1.8;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(212, 184, 138, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(219, 165, 58, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(58, 42, 26, 0.02) 1px, transparent 0);
+  background-size: auto, auto, 18px 18px;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--horse);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--tiger);
+}
+
+/* ===== Masthead ===== */
+.masthead {
+  background: var(--paper);
+  padding: 1.4rem 1.25rem 1rem;
+  position: relative;
+  border-bottom: 2px solid var(--ink);
+  background-image:
+    repeating-linear-gradient(45deg,
+      transparent,
+      transparent 8px,
+      rgba(212, 184, 138, 0.12) 8px,
+      rgba(212, 184, 138, 0.12) 9px);
+}
+
+.masthead::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: repeating-linear-gradient(90deg,
+      var(--horse) 0 14px,
+      transparent 14px 24px,
+      var(--tiger) 24px 38px,
+      transparent 38px 48px);
+  opacity: 0.7;
+}
+
+.masthead-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.brand-name {
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 6vw, 3.8rem);
+  font-weight: 400;
+  margin: 0;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  display: flex;
+  align-items: baseline;
+  gap: 0.15em;
+}
+
+.brand-name a {
+  color: var(--ink);
+  text-decoration: none;
+  display: inline-flex;
+  gap: 0.05em;
+}
+
+.brand-ma {
+  color: var(--horse);
+  display: inline-block;
+  transform: rotate(-3deg);
+}
+
+.brand-hu {
+  color: var(--tiger);
+  display: inline-block;
+  transform: rotate(2deg);
+}
+
+.brand-tag {
+  font-family: var(--brush);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: 0.5rem 0 0;
+  letter-spacing: 0.1em;
+}
+
+.nav-links {
+  display: flex;
+  gap: 1.2rem;
+  font-size: 0.9rem;
+}
+
+.nav-links a {
+  color: var(--ink);
+  text-decoration: none;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--brush);
+  transition: background 0.2s;
+}
+
+.nav-links a:hover {
+  background: var(--bg-warm);
+  color: var(--horse);
+}
+
+/* ===== Container ===== */
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+/* ===== Lede ===== */
+.lede {
+  margin: 1.5rem auto 2.5rem;
+  padding: 1.5rem 1.5rem;
+  max-width: 680px;
+  text-align: center;
+  background: var(--paper);
+  border-radius: 4px;
+  position: relative;
+  border: 1px dashed var(--rule);
+}
+
+.lede-text {
+  font-family: var(--brush);
+  font-size: clamp(1rem, 2.4vw, 1.15rem);
+  font-weight: 400;
+  line-height: 2;
+  margin: 0;
+  color: var(--ink);
+}
+
+.lede-meaning {
+  margin-top: 0.8rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.05em;
+}
+
+/* ===== Control bar ===== */
+.control-bar {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.2rem;
+  margin-bottom: 2rem;
+  background: var(--paper);
+  border-radius: 6px;
+  border: 1px solid var(--rule-faint);
+  align-items: flex-start;
+}
+
+.date-display,
+.place-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ctl-label {
+  font-family: var(--brush);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.05em;
+}
+
+.date-value {
+  font-family: var(--display);
+  font-size: 1.25rem;
+  color: var(--ink);
+  padding: 0.35rem 0;
+}
+
+.place-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.place-btn {
+  font-family: var(--display);
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--bg);
+  border: 2px solid var(--ink);
+  border-radius: 50px;
+  padding: 0.35rem 1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.05em;
+}
+
+.place-btn:hover {
+  background: var(--bg-warm);
+}
+
+.place-btn.active {
+  background: var(--horse);
+  border-color: var(--horse);
+  color: var(--paper);
+  transform: rotate(-1deg);
+}
+
+/* ===== Sections ===== */
+.section {
+  margin-bottom: 3rem;
+}
+
+.section-head {
+  font-family: var(--display);
+  font-size: clamp(1.4rem, 3vw, 1.7rem);
+  font-weight: 400;
+  margin: 0 0 0.3rem;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  display: inline-block;
+  position: relative;
+  padding: 0.2rem 0.6rem;
+}
+
+.section-head::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--tiger);
+  opacity: 0.25;
+  border-radius: 2px;
+  z-index: -1;
+  transform: rotate(-0.5deg);
+}
+
+.section-sub {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  margin: 0.5rem 0 1.4rem;
+  line-height: 1.8;
+  font-family: var(--brush);
+}
+
+/* ===== Surface block ===== */
+.surface-block {
+  margin-bottom: 2rem;
+  padding: 1.4rem;
+  background: var(--paper);
+  border-radius: 10px;
+  border: 1px solid var(--rule-faint);
+  position: relative;
+}
+
+.surface-tag {
+  display: inline-block;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  background: var(--green);
+  color: var(--paper);
+  padding: 0.2rem 0.9rem;
+  margin-bottom: 1rem;
+  border-radius: 50px;
+  letter-spacing: 0.1em;
+  transform: rotate(-1deg);
+}
+
+.surface-tag.dirt {
+  background: #8B5E3C;
+}
+
+.surface-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.surface-header .surface-tag {
+  margin-bottom: 0;
+}
+
+.best-combo {
+  font-family: var(--brush);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  padding: 0.2rem 0.7rem;
+  background: var(--bg-warm);
+  border-radius: 50px;
+  border: 1px dashed var(--rule);
+}
+
+.best-combo b {
+  font-family: var(--display);
+  font-weight: 400;
+  color: var(--horse);
+  font-size: 1.02em;
+}
+
+.sub-head {
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-weight: 400;
+  margin: 1.4rem 0 0.6rem;
+  color: var(--ink);
+  letter-spacing: 0.05em;
+}
+
+.sub-head:first-of-type {
+  margin-top: 0.3rem;
+}
+
+.sub-head::before {
+  content: "▸ ";
+  color: var(--horse);
+}
+
+/* ===== Tables ===== */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.5rem;
+}
+
+.data-table th,
+.data-table td {
+  text-align: right;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px dashed var(--rule-faint);
+  font-size: 0.95rem;
+}
+
+.data-table th:first-child,
+.data-table td:first-child {
+  text-align: left;
+  font-family: var(--display);
+  font-size: 1rem;
+}
+
+.data-table thead th {
+  border-bottom: 2px solid var(--ink);
+  font-family: var(--brush);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
+
+.data-table tbody tr:hover {
+  background: var(--bg-warm);
+}
+
+/* 枠バイアス表と脚質バイアス表で列幅を揃える */
+.data-table.bias-table {
+  table-layout: fixed;
+}
+
+.data-table.bias-table th,
+.data-table.bias-table td {
+  width: 25%;
+}
+
+.plus {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.minus {
+  color: var(--horse);
+}
+
+/* ===== Stat line ===== */
+.stat-line {
+  font-family: var(--gothic);
+  font-size: 0.95rem;
+  margin: 0.6rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: baseline;
+}
+
+.stat-line>span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.2rem 0.8rem;
+  background: var(--bg-warm);
+  border-radius: 50px;
+  border: 1px solid var(--rule-faint);
+}
+
+.stat-line .label {
+  font-family: var(--brush);
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+
+.stat-num {
+  font-family: var(--display);
+  font-size: 1.05em;
+  color: var(--ink);
+}
+
+/* ===== Loading ===== */
+.loading {
+  text-align: center;
+  color: var(--ink-soft);
+  padding: 3rem 1rem;
+  font-family: var(--brush);
+  font-size: 1rem;
+}
+
+/* ===== Ad slot ===== */
+.ad-slot {
+  margin: 3rem 0;
+  padding: 1.2rem 0;
+  text-align: center;
+  border-top: 1px dashed var(--rule);
+  border-bottom: 1px dashed var(--rule);
+}
+
+.ad-slot::before {
+  content: "PR";
+  display: block;
+  font-family: var(--brush);
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.3em;
+}
+
+/* ===== Prose pages ===== */
+.prose {
+  max-width: 700px;
+  margin: 0 auto;
+  font-size: 1rem;
+  line-height: 2;
+  background: var(--paper);
+  padding: 2rem 2rem;
+  border-radius: 10px;
+  border: 1px solid var(--rule-faint);
+}
+
+.prose h2.section-head {
+  margin-top: 0;
+}
+
+.prose h3 {
+  font-family: var(--display);
+  font-size: 1.2rem;
+  font-weight: 400;
+  margin: 1.8rem 0 0.6rem;
+  letter-spacing: 0.05em;
+  display: inline-block;
+  position: relative;
+  padding: 0 0.4rem;
+}
+
+.prose h3::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--pink);
+  opacity: 0.4;
+  border-radius: 2px;
+  z-index: -1;
+  transform: rotate(-0.3deg);
+}
+
+.prose p {
+  margin: 1rem 0;
+}
+
+.prose ul {
+  padding-left: 1.5rem;
+}
+
+.prose li {
+  margin: 0.4rem 0;
+}
+
+.prose strong {
+  color: var(--horse);
+  font-weight: 700;
+}
+
+.prose em {
+  font-style: normal;
+  background: linear-gradient(transparent 60%, rgba(219, 165, 58, 0.4) 60%);
+  padding: 0 0.1em;
+}
+
+.prose-meta {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--rule);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-family: var(--brush);
+}
+
+/* ===== Footer ===== */
+.site-footer {
+  border-top: 2px solid var(--ink);
+  padding: 1.8rem 1.25rem 2rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  background: var(--paper);
+  font-family: var(--brush);
+  position: relative;
+}
+
+.site-footer::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: repeating-linear-gradient(90deg,
+      var(--tiger) 0 14px,
+      transparent 14px 24px,
+      var(--horse) 24px 38px,
+      transparent 38px 48px);
+  opacity: 0.7;
+}
+
+.site-footer p {
+  margin: 0.4rem 0;
+}
+
+.site-footer .disclaimer {
+  font-size: 0.76rem;
+  max-width: 540px;
+  margin: 0.6rem auto;
+}
+
+.site-footer .copyright {
+  margin-top: 1rem;
+  font-family: var(--display);
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 600px) {
+  body {
+    font-size: 15px;
+  }
+
+  .masthead {
+    padding: 1rem 1rem 0.7rem;
+  }
+
+  .masthead-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .brand-name {
+    font-size: 2.4rem;
+  }
+
+  .nav-links {
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+  }
+
+  .container {
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  .control-bar {
+    gap: 1rem;
+    padding: 0.8rem;
+    flex-direction: column;
+  }
+
+  .place-btn {
+    font-size: 0.95rem;
+    padding: 0.3rem 0.85rem;
+  }
+
+  .date-value {
+    font-size: 1.1rem;
+  }
+
+  .surface-block {
+    padding: 1rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 0.4rem 0.4rem;
+    font-size: 0.82rem;
+  }
+
+  .data-table th:first-child,
+  .data-table td:first-child {
+    font-size: 0.9rem;
+  }
+
+  .stat-line {
+    gap: 0.4rem;
+  }
+
+  .stat-line>span {
+    padding: 0.15rem 0.55rem;
+  }
+
+  .prose {
+    padding: 1.4rem 1.2rem;
+  }
+}
