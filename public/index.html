@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>马马虎虎 | JRA結果のゆるい集計</title>
+  <title>馬馬虎虎 | JRA結果のゆるい集計</title>
   <meta name="description" content="JRA中央競馬の結果を、ゆる〜く集計。馬場の癖と好調騎手を、まあまあな感じでお届けします。">
-  <meta property="og:title" content="马马虎虎 | JRA結果のゆるい集計">
+  <meta property="og:title" content="馬馬虎虎 | JRA結果のゆるい集計">
   <meta property="og:description" content="ガチ予想ゼロ、結果のみ。馬か虎か、見極めはあなた次第。">
   <meta property="og:type" content="website">
 
@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Yusei+Magic&family=Klee+One:wght@400;600&family=Zen+Maru+Gothic:wght@400;500;700&family=Hachi+Maru+Pop&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@100..900&family=Yusei+Magic&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 
@@ -37,15 +37,9 @@
   <header class="masthead">
     <div class="masthead-inner">
       <div class="brand">
-        <h1 class="brand-name"><a href="index.html"><span class="brand-ma">马马</span><span class="brand-hu">虎虎</span></a>
+        <h1 class="brand-name"><a href="index.html"><span class="brand-ma">馬馬</span><span class="brand-hu">虎虎</span></a>
         </h1>
-        <p class="brand-tag">マーマーフーフー — JRA結果のゆるい集計</p>
       </div>
-      <nav class="nav-links">
-        <a href="index.html">きょうの</a>
-        <a href="about.html">なんなの</a>
-        <a href="privacy.html">プライバシー</a>
-      </nav>
     </div>
   </header>
 
@@ -53,23 +47,21 @@
 
     <section class="lede">
       <p class="lede-text">JRAの結果を、ゆるく集計しました。<br>馬場の癖と好調騎手、まあまあの精度でどうぞ。</p>
-      <p class="lede-meaning">马马虎虎 / ma ma hu hu / 中国語で「まあまあ、いい加減」</p>
+      <p class="lede-meaning">馬馬虎虎 / ma ma hu hu / 中国語で「まあまあ、いい加減」</p>
+      <div class="control-bar">
+        <div class="date-display">
+          <span class="date-value" id="date-display">--</span>
+        </div>
+        <div class="buttons-container">
+          <div class="place-tabs">
+            <div id="place-buttons" class="place-buttons"></div>
+          </div>
+          <div class="place-tabs">
+            <div id="surface-buttons" class="place-buttons"></div>
+          </div>
+        </div>
+      </div>
     </section>
-
-    <div class="control-bar">
-      <div class="date-display">
-        <span class="ctl-label">きょうの</span>
-        <span class="date-value" id="date-display">--</span>
-      </div>
-      <div class="place-tabs">
-        <span class="ctl-label">どこの</span>
-        <div id="place-buttons" class="place-buttons"></div>
-      </div>
-      <div class="place-tabs">
-        <span class="ctl-label">なんの</span>
-        <div id="surface-buttons" class="place-buttons"></div>
-      </div>
-    </div>
 
     <div id="report" class="report">
       <p class="loading">よみこみちゅう...</p>
@@ -91,8 +83,12 @@
   </main>
 
   <footer class="site-footer">
-    <p class="disclaimer">分析は管理人の独自集計です。<br>馬か虎か、見極めはあなた次第。<br>20歳以上、自己責任でゆるくお楽しみください。</p>
-    <p class="copyright">&copy; <span id="year"></span> 马马虎虎</p>
+    <nav class="nav-links">
+      <a href="index.html">きょうの</a>
+      <a href="about.html">なんなの</a>
+      <a href="privacy.html">プライバシー</a>
+    </nav>
+    <p class="copyright">&copy;<span id="year"></span> 馬馬虎虎</p>
   </footer>
 
   <script src="app.js"></script>

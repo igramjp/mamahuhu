@@ -32,14 +32,14 @@ function biasTable(rows, firstColLabel, firstColKey) {
 
 const FRAME_PREFIX = { "内": "内枠の", "外": "外枠の" };
 
-function renderSurface(surface, data) {
+function renderSurface(surface, data, place) {
   const meta = SURFACE_META[surface] || { cls: "" };
   const c = data.best_combo;
   const comboHtml = c
-    ? `<span class="best-combo">いちばん走った: <b>${(FRAME_PREFIX[c["内外"]] || c["内外"]) + c["脚質"]}</b>　複勝率 ${pct(c["複勝率"])}（${c["出走数"]}頭）</span>`
+    ? `<br><span class="best-combo">いちばん走ったのは:<br><b>${(FRAME_PREFIX[c["内外"]] || c["内外"]) + c["脚質"]}</b><small>※複勝率 ${pct(c["複勝率"])}（${c["出走数"]}頭）</small></span>`
     : '';
   return `<div class="surface-block">
-    <div class="surface-header"><span class="surface-tag ${meta.cls}">${surface}</span>${comboHtml}</div>
+    <div class="surface-header"><span class="surface-tag ${meta.cls}">${place}・${surface}</span>${comboHtml}</div>
     <h3 class="sub-head">枠バイアス（内・外）</h3>
     ${biasTable(data.frame_bias, "区分", "内外")}
     <h3 class="sub-head">脚質バイアス</h3>
@@ -67,7 +67,7 @@ function renderJockeys(jockeys) {
   return html + '</tbody></table>';
 }
 
-function renderReport(data, surface) {
+function renderReport(data, surface, place) {
   const root = $('#report');
   let html = '';
 
@@ -79,7 +79,7 @@ function renderReport(data, surface) {
     <h2 class="section-head">トラックバイアス</h2>
     <p class="section-sub">枠順を2区分（内1-4 / 外5-8）と脚質ごとに集計。差が大きいほど偏りが強い。</p>`;
   if (surfaceData) {
-    html += renderSurface(surface, surfaceData);
+    html += renderSurface(surface, surfaceData, place);
   } else {
     html += `<p class="muted">${surface}のレースはありませんでした。</p>`;
   }
@@ -127,13 +127,14 @@ async function init() {
   const btnContainer = $('#place-buttons');
   const surfBtnContainer = $('#surface-buttons');
   let currentFilename = latestItems[0].filename;
+  let currentPlace = latestItems[0].place;
   let currentSurface = '芝';
 
   async function loadAndRender(filename) {
     $('#report').innerHTML = '<p class="loading">読み込み中...</p>';
     try {
       const data = await fetchJSON(`data/${filename}`);
-      renderReport(data, currentSurface);
+      renderReport(data, currentSurface, currentPlace);
     } catch (e) {
       $('#report').innerHTML = `<p class="loading">読み込みエラー: ${e.message}</p>`;
     }
@@ -149,6 +150,7 @@ async function init() {
       btnContainer.querySelectorAll('.place-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentFilename = it.filename;
+      currentPlace = it.place;
       loadAndRender(it.filename);
     });
     btnContainer.appendChild(btn);
@@ -175,8 +177,8 @@ async function init() {
     fetchJSON(`data/${it.filename}`).then(d => [it.place, pickDisplayed(d)])
   )).then(pairs => {
     const merged = { date: latestDate, places: Object.fromEntries(pairs) };
-    console.log(JSON.stringify(merged, null, 2));
-  }).catch(e => console.warn('[马马虎虎] 集約取得エラー', e));
+    // console.log(JSON.stringify(merged, null, 2));
+  }).catch(e => console.warn('[馬馬虎虎] 集約取得エラー', e));
 }
 
 // HTMLに表示される項目だけを抽出
