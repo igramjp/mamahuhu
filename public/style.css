@@ -454,3 +454,8 @@ article.content ul {
   height: auto;
   top: -27.5px;
 }
+
+.content-wrapper h3 {
+  line-height: 1;
+  margin-bottom: 11px;
+}
