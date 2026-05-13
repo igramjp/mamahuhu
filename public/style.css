@@ -90,7 +90,7 @@ header h1 {
   right: 0;
   margin: auto;
   width: 100%;
-  height: calc(100dvh - 291px);
+  height: calc(100dvh - 345px);
   max-width: 660px;
   display: flex;
   justify-content: center;
@@ -102,7 +102,7 @@ header h1 {
   position: relative;
   width: calc(100% - 44px);
   height: auto;
-  max-height: calc(100dvh - 291px);
+  max-height: calc(100dvh - 345px);
   object-fit: contain;
 }
 
