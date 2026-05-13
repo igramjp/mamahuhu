@@ -67,6 +67,45 @@ header {
   align-items: center;
 }
 
+header h1 {
+  display: block !important;
+  transform: scale(1, 1) !important;
+  transform-origin: center center !important;
+  transform-box: fill-box !important;
+}
+
+.logo {
+  display: block;
+  overflow: hidden;
+  position: relative;
+  width: auto;
+  height: 55px;
+}
+
+.results-summary {
+  overflow: hidden;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: auto;
+  width: 100%;
+  height: calc(100dvh - 291px);
+  max-width: 660px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.results-summary img {
+  overflow: hidden;
+  position: relative;
+  width: calc(100% - 44px);
+  height: auto;
+  max-height: calc(100dvh - 291px);
+  object-fit: contain;
+}
+
 .masthead-inner {
   overflow: hidden;
   position: relative;

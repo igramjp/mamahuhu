@@ -67,12 +67,27 @@ function renderJockeys(jockeys) {
   return html + '</tbody></table>';
 }
 
+function updateComboImage(c) {
+  const img = $('#combo-image');
+  if (!img) return;
+  if (c && c["内外"] && c["脚質"]) {
+    img.src = `/images/${c["内外"]}枠${c["脚質"]}.gif?t=${Date.now()}`;
+    img.alt = `${(FRAME_PREFIX[c["内外"]] || c["内外"]) + c["脚質"]}`;
+    img.hidden = false;
+  } else {
+    img.removeAttribute('src');
+    img.alt = '';
+    img.hidden = true;
+  }
+}
+
 function renderReport(data, surface, place) {
   const root = $('#report');
   let html = '';
 
   const surfaces = data.surfaces || {};
   const surfaceData = surfaces[surface];
+  updateComboImage(surfaceData && surfaceData.best_combo);
 
   // バイアス
   html += `<section class="section">
@@ -171,32 +186,6 @@ async function init() {
   }
 
   loadAndRender(currentFilename);
-
-  // 全場まとめてコンソールに出力（HTML表示と同じ項目だけ）
-  Promise.all(latestItems.map(it =>
-    fetchJSON(`data/${it.filename}`).then(d => [it.place, pickDisplayed(d)])
-  )).then(pairs => {
-    const merged = { date: latestDate, places: Object.fromEntries(pairs) };
-    // console.log(JSON.stringify(merged, null, 2));
-  }).catch(e => console.warn('[馬馬虎虎] 集約取得エラー', e));
-}
-
-// HTMLに表示される項目だけを抽出
-function pickDisplayed(data) {
-  const surfaces = {};
-  for (const s of ["芝", "ダート"]) {
-    const v = (data.surfaces || {})[s];
-    if (!v) continue;
-    surfaces[s] = {
-      frame_bias: v.frame_bias,
-      style_bias: v.style_bias,
-      best_combo: v.best_combo,
-    };
-  }
-  return {
-    surfaces,
-    hot_jockeys: data.hot_jockeys,
-  };
 }
 
 function formatDateWithDow(yyyymmdd) {
