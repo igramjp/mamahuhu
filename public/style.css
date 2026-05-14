@@ -123,6 +123,52 @@ main {
   height: auto;
 }
 
+.link-button {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  height: auto;
+  background: #d0d0d0;
+  padding: 0 22px 33px 22px;
+  text-align: center;
+}
+
+.link-button a {
+  display: block;
+  width: 100%;
+  max-width: 660px;
+  height: 66px;
+  margin: 0 auto;
+  background: #767676;
+  color: #fff;
+  border-radius: 16.5px;
+  border: none;
+  text-decoration: none;
+  text-align: center;
+}
+
+.link-button a span {
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+  line-height: 64px;
+  color: #fff;
+  font-family: "Dela Gothic One", sans-serif;
+  font-size: 3rem;
+  font-weight: 700;
+  transform: scale(0.82, 1.18);
+  transform-origin: center center;
+  transform-box: fill-box;
+}
+
+.link-button a:hover {
+  background: #2f2f2f;
+}
+
+.link-button a:hover span {
+  color: #fff;
+}
+
 footer {
   overflow: hidden;
   position: relative;
@@ -509,6 +555,15 @@ article.content ul {
 .content-wrapper h3 {
   line-height: 1;
   margin-bottom: 11px;
+}
+
+.about-image {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  aspect-ratio: 8/3;
 }
 
 /* どうだった ページ */

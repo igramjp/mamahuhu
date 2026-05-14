@@ -127,6 +127,12 @@ async function init() {
     return;
   }
 
+  // 結果データがあればCTAボタンを表示
+  if (index.items.some(it => it.place === '結果')) {
+    const cta = $('#result-cta');
+    if (cta) cta.hidden = false;
+  }
+
   // 最新の日付を取得（indexはdesc順だが念のためソート）
   // 結果ファイルは別ページなので場ボタンから除外
   const placeItems = index.items.filter(it => it.place !== '結果');

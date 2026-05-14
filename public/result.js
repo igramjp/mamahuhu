@@ -116,6 +116,9 @@ async function init() {
     return;
   }
 
+  const cta = $('#index-cta');
+  if (cta) cta.hidden = false;
+
   kekkaItems.sort((a, b) => b.date.localeCompare(a.date));
   const latest = kekkaItems[0];
 
