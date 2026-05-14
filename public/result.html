@@ -4,14 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>馬馬虎虎 | JRA結果のゆるい集計</title>
-  <meta name="description" content="JRA中央競馬の結果を、ゆる〜く集計。馬場の癖と好調騎手を、まあまあな感じでお届けします。">
-  <link rel="canonical" href="https://mamahuhu.app/">
+  <title>どうだった | 馬馬虎虎</title>
+  <meta name="description" content="前日のバイアスと好調騎手を、きょうの結果に当ててみた振り返り。馬か虎か、結果でジャッジ。">
+  <link rel="canonical" href="https://mamahuhu.app/result">
 
-  <meta property="og:title" content="馬馬虎虎 | JRA結果のゆるい集計">
-  <meta property="og:description" content="ガチ予想ゼロ、結果のみ。馬か虎か、見極めはあなた次第。">
+  <meta property="og:title" content="どうだった | 馬馬虎虎">
+  <meta property="og:description" content="前日のバイアスと好調騎手を、きょうの結果に当ててみた振り返り。馬か虎か、結果でジャッジ。">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://mamahuhu.app/">
+  <meta property="og:url" content="https://mamahuhu.app/result">
   <meta property="og:image" content="https://mamahuhu.app/images/thumbnail.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -19,8 +19,8 @@
   <meta property="og:site_name" content="馬馬虎虎">
   <meta property="og:locale" content="ja_JP">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="馬馬虎虎 | JRA結果のゆるい集計">
-  <meta name="twitter:description" content="ガチ予想ゼロ、結果のみ。馬か虎か、見極めはあなた次第。">
+  <meta name="twitter:title" content="どうだった | 馬馬虎虎">
+  <meta name="twitter:description" content="前日のバイアスと好調騎手を、きょうの結果に当ててみた振り返り。馬か虎か、結果でジャッジ。">
   <meta name="twitter:image" content="https://mamahuhu.app/images/thumbnail.jpg">
 
   <link rel="icon" href="/images/favicon.ico" sizes="any">
@@ -40,11 +40,6 @@
     href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@100..900&family=Yusei+Magic&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-
-  <!-- Google AdSense: 承認後にコメントを外し、ca-pub-XXXX を自分のIDに置換 -->
-  <!--
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
--->
 </head>
 
 <body>
@@ -54,8 +49,7 @@
       <div class="brand">
         <h1 class="brand-name">
           <a href="index.html">
-            <img class="logo" src="/images/logo.webp" alt="馬馬虎虎(マーマ
-          ーフーフー)">
+            <img class="logo" src="/images/logo.webp" alt="馬馬虎虎(マーマーフーフー)">
           </a>
         </h1>
       </div>
@@ -64,9 +58,8 @@
 
   <main class="container">
 
-    <section class="lede">
-      <p class="lede-text">JRAの結果を、ゆるく集計しました。<br>馬場の癖と好調騎手、まあまあの精度でどうぞ。</p>
-      <p class="lede-meaning">馬馬虎虎 / ma ma hu hu / 中国語で「まあまあ、いい加減」</p>
+    <section class="lede lede-compact">
+      <p class="lede-text">前日のバイアスを、きょうの結果に当ててみました。<br>馬か虎か、見てのお楽しみ。</p>
       <div class="control-bar">
         <div class="date-display">
           <span class="date-value" id="date-display">--</span>
@@ -75,32 +68,13 @@
           <div class="place-tabs">
             <div id="place-buttons" class="place-buttons"></div>
           </div>
-          <div class="place-tabs">
-            <div id="surface-buttons" class="place-buttons"></div>
-          </div>
         </div>
-      </div>
-      <div class="results-summary">
-        <img id="combo-image" alt="" hidden>
       </div>
     </section>
 
-    <div id="report" class="report">
+    <div id="report" class="report result-report">
       <p class="loading">よみこみちゅう...</p>
     </div>
-
-    <!-- AdSense広告枠: 承認後にコメントを外し、自分のIDに置換 -->
-    <!--
-  <div class="ad-slot">
-    <ins class="adsbygoogle"
-         style="display:block"
-         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
-         data-ad-slot="XXXXXXXXXX"
-         data-ad-format="auto"
-         data-full-width-responsive="true"></ins>
-    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-  </div>
-  -->
 
   </main>
 
@@ -114,7 +88,7 @@
     <p class="copyright">&copy;<span id="year"></span> 馬馬虎虎</p>
   </footer>
 
-  <script src="app.js"></script>
+  <script src="result.js"></script>
 </body>
 
 </html>

@@ -237,7 +237,29 @@ def analyze_to_dict(df, place, yyyymmdd):
         "total_races": int(df["race_id"].nunique()),
         "surfaces": surfaces,
         "hot_jockeys": hot_jockeys_for(df),
+        "races": per_race_top3(df),
     }
+
+
+def per_race_top3(df):
+    """各レースの上位3頭の属性(着順/内外/脚質/騎手)を抽出。
+    結果ページの前日バイアス照合に使う。"""
+    races = []
+    for rid, group in df.groupby("race_id"):
+        race_no = int(str(rid)[-2:])
+        surface = str(group["コース"].iloc[0]) if len(group) else "?"
+        top3 = group[group["着順"].isin([1, 2, 3])].sort_values("着順")
+        top3_data = []
+        for _, row in top3.iterrows():
+            top3_data.append({
+                "着順": int(row["着順"]),
+                "内外": str(row["内外"]) if pd.notna(row["内外"]) else None,
+                "脚質": str(row["脚質"]) if pd.notna(row["脚質"]) else None,
+                "騎手": str(row["騎手"]) if pd.notna(row["騎手"]) else None,
+            })
+        races.append({"R": race_no, "surface": surface, "top3": top3_data})
+    races.sort(key=lambda x: x["R"])
+    return races
 
 
 # ---------- 実行制御 ----------
@@ -273,8 +295,14 @@ def process_place(place, target_date=None):
 
     out_path = DATA_DIR / f"{yyyymmdd}_{place}.json"
     if out_path.exists():
-        print(f"[{place}] 既存ファイルあり、スキップ: {out_path.name}")
-        return {"place": place, "date": yyyymmdd, "filename": out_path.name}
+        try:
+            existing = json.loads(out_path.read_text(encoding="utf-8"))
+        except Exception:
+            existing = {}
+        if "races" in existing:
+            print(f"[{place}] 既存ファイルあり、スキップ: {out_path.name}")
+            return {"place": place, "date": yyyymmdd, "filename": out_path.name}
+        print(f"[{place}] 既存ファイルにレース詳細なし、再処理します")
 
     dfs = []
     for rid in ids:
@@ -310,7 +338,9 @@ def update_index():
                 "place": m.group(2),
                 "filename": f.name,
             })
-    items.sort(key=lambda x: (x["date"], x["place"]), reverse=True)
+    # date は降順 (新しい順)、同一日内では place は昇順
+    items.sort(key=lambda x: x["place"])
+    items.sort(key=lambda x: x["date"], reverse=True)
 
     index = {
         "updated_at": datetime.now().isoformat(timespec="seconds"),
@@ -322,17 +352,115 @@ def update_index():
     print(f"\nindex.json: {len(items)}件")
 
 
+FRAME_LABEL = {"内": "内枠", "外": "外枠"}
+
+
+def _winning_entry(bias_list, key):
+    """frame_bias / style_bias から複勝率最大の区分名を返す。"""
+    if not bias_list:
+        return None
+    best = max(bias_list, key=lambda x: (x["複勝率"], x["出走数"]))
+    return best[key]
+
+
+def _build_kekka_for_place(today_data, prev_data):
+    winning_by_surface = {}
+    surfaces_combo = {}
+    for surface, sdata in (prev_data.get("surfaces") or {}).items():
+        winning_by_surface[surface] = {
+            "frame": _winning_entry(sdata.get("frame_bias", []), "内外"),
+            "style": _winning_entry(sdata.get("style_bias", []), "脚質"),
+        }
+        bc = sdata.get("best_combo")
+        if bc:
+            surfaces_combo[surface] = bc
+
+    hot_jockey_names = {hj["騎手"] for hj in (prev_data.get("hot_jockeys") or [])}
+
+    races_out = []
+    for race in today_data.get("races", []):
+        surface = race.get("surface")
+        win = winning_by_surface.get(surface, {"frame": None, "style": None})
+        hits = []
+        for horse in race.get("top3", []):
+            labels = []
+            if win["frame"] and horse.get("内外") == win["frame"]:
+                labels.append(FRAME_LABEL.get(horse["内外"], horse["内外"]))
+            if win["style"] and horse.get("脚質") == win["style"]:
+                labels.append(horse["脚質"])
+            if horse.get("騎手") and horse["騎手"] in hot_jockey_names:
+                labels.append(horse["騎手"])
+            if labels:
+                hits.append({"着順": horse["着順"], "labels": labels})
+        races_out.append({"R": race["R"], "surface": surface, "hits": hits})
+
+    return {
+        "place": today_data["place"],
+        "prev_date": prev_data["date"],
+        "surfaces": surfaces_combo,
+        "races": races_out,
+    }
+
+
+def build_kekka(target_date):
+    """{target_date}_結果.json を生成。前日JSONがある場のみ対象。"""
+    today_date_obj = datetime.strptime(target_date, "%Y%m%d").date()
+    prev_date = (today_date_obj - timedelta(days=1)).strftime("%Y%m%d")
+    out_filename = f"{target_date}_結果.json"
+
+    places_out = []
+    for f in sorted(DATA_DIR.glob(f"{target_date}_*.json")):
+        if f.name == out_filename:
+            continue
+        m = re.match(rf"{target_date}_(.+)\.json", f.name)
+        if not m:
+            continue
+        place = m.group(1)
+        prev_path = DATA_DIR / f"{prev_date}_{place}.json"
+        if not prev_path.exists():
+            continue
+        today_data = json.loads(f.read_text(encoding="utf-8"))
+        prev_data = json.loads(prev_path.read_text(encoding="utf-8"))
+        if "races" not in today_data:
+            print(f"  [{place}] racesフィールドなし、結果スキップ")
+            continue
+        places_out.append(_build_kekka_for_place(today_data, prev_data))
+
+    if not places_out:
+        print(f"\n結果({target_date}): 前日データなし、生成スキップ")
+        return
+
+    out = {
+        "date": target_date,
+        "prev_date": prev_date,
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "places": places_out,
+    }
+    out_path = DATA_DIR / out_filename
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
+    print(f"\n結果: {out_path.name} ({len(places_out)}場)")
+
+
 def main():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     target_date = sys.argv[1] if len(sys.argv) > 1 else None
     if target_date:
         print(f"対象日付: {target_date}")
+
+    dates_touched = set()
     for place in COURSE.keys():
         try:
-            process_place(place, target_date)
+            result = process_place(place, target_date)
+            if result:
+                dates_touched.add(result["date"])
         except Exception as e:
             print(f"[{place}] エラー: {e}")
         time.sleep(SLEEP_BETWEEN_PLACES)
+
+    for d in sorted(dates_touched):
+        build_kekka(d)
+
     update_index()
     print("\n完了")
 

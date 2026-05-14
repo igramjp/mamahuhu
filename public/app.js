@@ -128,12 +128,14 @@ async function init() {
   }
 
   // 最新の日付を取得（indexはdesc順だが念のためソート）
-  const latestDate = index.items
+  // 結果ファイルは別ページなので場ボタンから除外
+  const placeItems = index.items.filter(it => it.place !== '結果');
+  const latestDate = placeItems
     .map(it => it.date)
     .sort()
     .reverse()[0];
 
-  const latestItems = index.items.filter(it => it.date === latestDate);
+  const latestItems = placeItems.filter(it => it.date === latestDate);
 
   // 日付表示（曜日付き）
   $('#date-display').textContent = formatDateWithDow(latestDate);

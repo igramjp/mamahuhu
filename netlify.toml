@@ -14,6 +14,11 @@
   to = "/privacy.html"
   status = 200
 
+[[redirects]]
+  from = "/result"
+  to = "/result.html"
+  status = 200
+
 # キャッシュ設定: JSONは短め、HTMLは中程度、静的アセットは長め
 [[headers]]
   for = "/data/*.json"
