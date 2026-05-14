@@ -129,7 +129,7 @@ main {
   width: 100%;
   height: auto;
   background: #d0d0d0;
-  padding: 0 22px 33px 22px;
+  padding: 0 22px 27.5px 22px;
   text-align: center;
 }
 
@@ -215,7 +215,7 @@ footer {
   align-items: center;
   justify-content: center;
   background: #d0d0d0;
-  padding: 55px 22px;
+  padding: 55px 22px 38.5px 22px;
   gap: 55px;
 }
 
