@@ -99,9 +99,6 @@ function renderResult(data) {
 }
 
 async function init() {
-  const yearEl = $('#year');
-  if (yearEl) yearEl.textContent = new Date().getFullYear();
-
   let index;
   try {
     index = await fetchJSON('data/index.json');
