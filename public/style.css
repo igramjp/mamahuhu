@@ -658,6 +658,7 @@ table.data-table.result-table tbody tr td .race-no {
 table.data-table.result-table thead tr th:nth-child(1),
 table.data-table.result-table tbody tr td.race-cell {
   width: auto;
+  min-width: 81px;
   max-width: 81px;
   text-align: left;
 }
