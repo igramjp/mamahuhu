@@ -117,7 +117,7 @@ header h1 {
 }
 
 main {
-  overflow: visible;
+  overflow: hidden;
   position: relative;
   width: 100%;
   height: auto;
@@ -516,7 +516,7 @@ table.data-table.bias-table tbody tr td:nth-child(4) {
 }
 
 main.content-container {
-  overflow: visible;
+  overflow: hidden;
   position: relative;
   width: 100%;
   height: auto;
@@ -609,24 +609,37 @@ section.lede.lede-compact {
   font-family: "Noto Sans JP", sans-serif;
   font-size: 0.7em;
   font-weight: 700;
-  padding: 1px 9px 2px 9px;
+  padding: 1.5px 9px 1.5px 9px;
   border-radius: 8px;
   vertical-align: middle;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
-.miss {
-  display: inline-block;
+.chip.chip-hit {
   background: #2f2f2f;
   color: #fff;
+}
+
+.chip.chip-miss {
+  background: #fff;
+  color: #767676;
+}
+
+table.data-table.result-table tbody tr td {
+  vertical-align: middle;
+}
+
+.horse-num {
+  display: inline-block;
   font-family: "Noto Sans JP", sans-serif;
   font-size: 0.7em;
   font-weight: 700;
-  padding: 1px 9px 2px 9px;
-  border-radius: 8px;
-  margin: 1px 2px;
-  vertical-align: middle;
-  line-height: 1.6;
+  border: 1px solid #d0d0d0;
+  color: #2f2f2f;
+  width: 25.4px;
+  height: 25.4px;
+  text-align: center;
+  line-height: 22.4px;
 }
 
 table.data-table.result-table tbody tr td small {
@@ -643,21 +656,22 @@ table.data-table.result-table tbody tr td .race-no {
 }
 
 table.data-table.result-table thead tr th:nth-child(1),
-table.data-table.result-table tbody tr td:nth-child(1) {
-  width: 22%;
-  min-width: 81px;
+table.data-table.result-table tbody tr td.race-cell {
+  width: auto;
+  max-width: 81px;
+  text-align: left;
 }
 
 table.data-table.result-table thead tr th:nth-child(2),
-table.data-table.result-table tbody tr td:nth-child(2) {
+table.data-table.result-table tbody tr td.result-cell {
   width: auto;
   min-width: auto;
   text-align: left;
 }
 
 table.data-table.result-table thead tr th:nth-child(3),
-table.data-table.result-table tbody tr td:nth-child(3) {
-  width: 18%;
-  min-width: 55px;
+table.data-table.result-table tbody tr td.rank-cell {
+  width: auto;
+  min-width: 33px;
   text-align: right;
 }

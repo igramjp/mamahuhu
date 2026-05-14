@@ -253,6 +253,7 @@ def per_race_top3(df):
         for _, row in top3.iterrows():
             top3_data.append({
                 "着順": int(row["着順"]),
+                "馬番": int(row["馬番"]) if pd.notna(row["馬番"]) else None,
                 "内外": str(row["内外"]) if pd.notna(row["内外"]) else None,
                 "脚質": str(row["脚質"]) if pd.notna(row["脚質"]) else None,
                 "騎手": str(row["騎手"]) if pd.notna(row["騎手"]) else None,
@@ -390,8 +391,11 @@ def _build_kekka_for_place(today_data, prev_data):
                 labels.append(horse["脚質"])
             if horse.get("騎手") and horse["騎手"] in hot_jockey_names:
                 labels.append(horse["騎手"])
-            if labels:
-                hits.append({"着順": horse["着順"], "labels": labels})
+            hits.append({
+                "着順": horse["着順"],
+                "馬番": horse.get("馬番"),
+                "labels": labels,
+            })
         races_out.append({"R": race["R"], "surface": surface, "hits": hits})
 
     return {

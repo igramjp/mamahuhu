@@ -55,14 +55,29 @@ function renderPlace(p) {
 
   let rows = '';
   for (const race of p.races) {
-    const rcell = `<td><span class="race-no">${race.R}R</span><small> ${race.surface}</small></td>`;
-    if (!race.hits || race.hits.length === 0) {
-      rows += `<tr>${rcell}<td><span class="miss">はずれ</span></td><td>—</td></tr>`;
-      continue;
-    }
-    for (const h of race.hits) {
-      const chips = h.labels.map(l => `<span class="chip">${l}</span>`).join('');
-      rows += `<tr>${rcell}<td><div class="chips">${chips}</div></td><td>${h["着順"]}着</td></tr>`;
+    const bias = p.surfaces && p.surfaces[race.surface];
+    const frameLabel = bias ? bias["内外"] + "枠" : null;
+    const styleLabel = bias ? bias["脚質"] : null;
+    const hitByRank = {};
+    for (const h of (race.hits || [])) hitByRank[h["着順"]] = h;
+    for (const rank of [1, 2, 3]) {
+      const rcell = rank === 1
+        ? `<td class="race-cell" rowspan="3"><span class="race-no">${race.R}R</span><small> ${race.surface}</small></td>`
+        : '';
+      const h = hitByRank[rank];
+      const numEl = h && h["馬番"] != null ? `<span class="horse-num">${h["馬番"]}</span>` : '';
+      let labelChips;
+      if (!h || !h.labels || h.labels.length === 0) {
+        labelChips = '<span class="chip chip-miss">該当なし</span>';
+      } else {
+        const isComboHit = frameLabel && styleLabel
+          && h.labels.includes(frameLabel) && h.labels.includes(styleLabel);
+        labelChips = h.labels.map(l => {
+          const hit = isComboHit && (l === frameLabel || l === styleLabel);
+          return `<span class="chip${hit ? ' chip-hit' : ''}">${l}</span>`;
+        }).join('');
+      }
+      rows += `<tr>${rcell}<td class="result-cell"><div class="chips">${numEl}${labelChips}</div></td><td class="rank-cell">${rank}</td></tr>`;
     }
   }
 
