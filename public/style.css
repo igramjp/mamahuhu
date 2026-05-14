@@ -625,6 +625,10 @@ section.lede.lede-compact {
   color: #767676;
 }
 
+table.data-table.result-table tbody tr:nth-child(3n) {
+  border-bottom: 3px solid #d0d0d0;
+}
+
 table.data-table.result-table tbody tr td {
   vertical-align: middle;
 }

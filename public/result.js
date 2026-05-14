@@ -85,7 +85,7 @@ function renderPlace(p) {
     <h2 class="section-head">${p.place}</h2>
     ${headlines}
     <table class="data-table result-table"><thead><tr>
-      <th>R</th><th>結果</th><th>着順</th>
+      <th>レース</th><th>結果</th><th>着順</th>
     </tr></thead><tbody>${rows}</tbody></table>
   </section>`;
 }
