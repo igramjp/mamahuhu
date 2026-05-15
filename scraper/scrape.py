@@ -167,25 +167,43 @@ def analyze_to_dict(df, place, yyyymmdd):
             })
         return out
 
-    def best_combo(sub, min_n=3):
+    def combo_matrix(sub):
         sub2 = sub.dropna(subset=["脚質"])
         if sub2.empty:
-            return None
+            return []
         grp = (
             sub2.groupby(["内外", "脚質"])
             .agg(n=("着順", "count"),
                  rate=("着順", lambda x: float((x <= 3).mean())))
             .reset_index()
         )
-        grp = grp[grp["n"] >= min_n]
-        if grp.empty:
+        return [
+            {
+                "内外": str(row["内外"]),
+                "脚質": str(row["脚質"]),
+                "複勝率": round(float(row["rate"]), 3),
+                "出走数": int(row["n"]),
+            }
+            for _, row in grp.iterrows()
+        ]
+
+    def best_combo(sub, frame_bias, style_bias, min_n=3):
+        # 4マス直接最大化はセルあたりn<25で分散が大きく、1頭分の差でブレる。
+        # 周辺(内外/脚質)はnが倍以上あって安定するので、各次元で最大を選び
+        # その組合せの実セルの率を返す。詳細な4マスは combo_matrix に残す。
+        sub2 = sub.dropna(subset=["脚質"])
+        if sub2.empty or not frame_bias or not style_bias:
             return None
-        best = grp.sort_values(["rate", "n"], ascending=[False, False]).iloc[0]
+        best_frame = max(frame_bias, key=lambda x: (x["複勝率"], x["出走数"]))
+        best_style = max(style_bias, key=lambda x: (x["複勝率"], x["出走数"]))
+        cell = sub2[(sub2["内外"] == best_frame["内外"]) & (sub2["脚質"] == best_style["脚質"])]
+        if len(cell) < min_n:
+            return None
         return {
-            "内外": str(best["内外"]),
-            "脚質": str(best["脚質"]),
-            "複勝率": round(float(best["rate"]), 3),
-            "出走数": int(best["n"]),
+            "内外": str(best_frame["内外"]),
+            "脚質": str(best_style["脚質"]),
+            "複勝率": round(float((cell["着順"] <= 3).mean()), 3),
+            "出走数": int(len(cell)),
         }
 
     df["人気差"] = df["人気"] - df["着順"]
@@ -223,11 +241,14 @@ def analyze_to_dict(df, place, yyyymmdd):
         if n_races == 0:
             continue
 
+        fb = bias_rows(sub, "内外", ["内", "外"])
+        sb = bias_rows(sub, "脚質", ["逃げ先行", "差し追込"])
         surfaces[surface] = {
             "race_count": int(n_races),
-            "frame_bias": bias_rows(sub, "内外", ["内", "外"]),
-            "style_bias": bias_rows(sub, "脚質", ["逃げ先行", "差し追込"]),
-            "best_combo": best_combo(sub),
+            "frame_bias": fb,
+            "style_bias": sb,
+            "best_combo": best_combo(sub, fb, sb),
+            "combo_matrix": combo_matrix(sub),
         }
 
     return {
