@@ -40,7 +40,7 @@ function renderSurface(surface, data, place) {
     : '';
   return `<div class="surface-block">
     <div class="surface-header"><span class="surface-tag ${meta.cls}">${place}・${surface}</span>${comboHtml}</div>
-    <h3 class="sub-head">枠バイアス（内・外）</h3>
+    <h3 class="sub-head">枠バイアス</h3>
     ${biasTable(data.frame_bias, "区分", "内外")}
     <h3 class="sub-head">脚質バイアス</h3>
     ${biasTable(data.style_bias, "脚質", "脚質")}
