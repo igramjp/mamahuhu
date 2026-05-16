@@ -2,10 +2,14 @@ name: Daily Scrape
 
 on:
   schedule:
-    # 土日の翌朝7時JST(=日曜・月曜の7時JST)に実行
-    # SAT 22:00 UTC = 日曜7時JST → 土曜分取得
-    # SUN 22:00 UTC = 月曜7時JST → 日曜分取得
-    - cron: '0 22 * * SAT,SUN'
+    # 土日18時JST = 09:00 UTC に実行(realtime取得、当日分)
+    # 最終Rが16:30前後で終わってから1時間〜90分後 = 通過順反映が間に合えば
+    # 通過順から脚質を計算、未反映なら前走脚質fallbackで補完。
+    - cron: '0 9 * * SAT,SUN'
+    # 火曜18時JST = 火曜09:00 UTC → 前週末分を db.netkeiba.com から取り直す
+    # (realtime取得時に通過順未反映で前走脚質fallbackを使った場合に、火曜の
+    # 正データで上書きしてバイアス計算を確定させる)
+    - cron: '0 9 * * TUE'
   workflow_dispatch:  # 月曜祝日開催等は手動実行
 
 jobs:
@@ -29,9 +33,24 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run scraper
+      - name: Run scraper (weekend realtime)
+        if: github.event.schedule != '0 9 * * TUE'
         run: |
-          python scraper/scrape.py
+          # 土日18時JSTに当日分をrealtime取得。
+          # target_date を渡すことで scrape.py がリアルタイム側(race.netkeiba.com)
+          # を使う。db.netkeiba.com は当週分の反映が火曜頃なので当日はこちら。
+          TARGET_DATE=$(TZ=Asia/Tokyo date +%Y%m%d)
+          python scraper/scrape.py "$TARGET_DATE"
+
+      - name: Run scraper (Tuesday db rebuild)
+        if: github.event.schedule == '0 9 * * TUE'
+        run: |
+          # 火曜18時JST。db.netkeiba.com に正データが入っているので前週末分を
+          # 取り直す。3日前(=土), 2日前(=日) を db 経路で再取得 → realtime版を上書き。
+          SAT=$(TZ=Asia/Tokyo date -d '3 days ago' +%Y%m%d)
+          SUN=$(TZ=Asia/Tokyo date -d '2 days ago' +%Y%m%d)
+          python scraper/scrape.py "$SAT"
+          python scraper/scrape.py "$SUN"
 
       - name: Commit and push
         run: |
