@@ -2,10 +2,10 @@ name: Daily Scrape
 
 on:
   schedule:
-    # 土日の翌朝5時JST(=日曜・月曜の5時JST)に実行
-    # SAT 20:00 UTC = 日曜5時JST → 土曜分取得
-    # SUN 20:00 UTC = 月曜5時JST → 日曜分取得
-    - cron: '0 20 * * SAT,SUN'
+    # 土日の翌朝7時JST(=日曜・月曜の7時JST)に実行
+    # SAT 22:00 UTC = 日曜7時JST → 土曜分取得
+    # SUN 22:00 UTC = 月曜7時JST → 日曜分取得
+    - cron: '0 22 * * SAT,SUN'
   workflow_dispatch:  # 月曜祝日開催等は手動実行
 
 jobs:
