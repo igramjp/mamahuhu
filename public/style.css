@@ -91,7 +91,7 @@ header h1 {
   right: 0;
   margin: auto;
   width: 100%;
-  height: calc(100dvh - 345px);
+  height: calc(100vh - 345px);
   max-width: 660px;
   display: flex;
   justify-content: center;
@@ -667,6 +667,15 @@ table.data-table.result-table tbody tr td.race-cell {
   text-align: left;
 }
 
+table.data-table.result-table tbody tr td.race-cell .race-name {
+  display: block;
+  font-family: "Noto Sans JP", sans-serif;
+  font-size: 0.7em;
+  font-weight: 500;
+  color: #767676;
+  word-break: break-word;
+}
+
 table.data-table.result-table thead tr th:nth-child(2),
 table.data-table.result-table tbody tr td.result-cell {
   width: auto;
@@ -679,4 +688,66 @@ table.data-table.result-table tbody tr td.rank-cell {
   width: auto;
   min-width: 33px;
   text-align: right;
+}
+
+/* 注目レース */
+.notable-race-head {
+  position: relative;
+  top: -5.5px;
+  margin-bottom: 11px;
+}
+
+.notable-race-name {
+  display: block;
+  font-family: "Dela Gothic One", sans-serif;
+  font-size: 1.5em;
+  font-weight: 400;
+  line-height: 1.25;
+  transform: scale(0.82, 1.18);
+  transform-origin: left center;
+  transform-box: fill-box;
+  margin-top: 5.5px;
+}
+
+.notable-meta {
+  display: block;
+  color: #767676;
+  font-size: 0.9em;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+table.data-table.notable-race-table tbody tr:first-child {
+  border-top: 3px solid #d0d0d0;
+}
+
+table.data-table.notable-race-table tbody tr td {
+  vertical-align: middle;
+  text-align: left;
+}
+
+table.data-table.notable-race-table tbody tr td.horse-num-cell {
+  width: 36px;
+  min-width: 36px;
+}
+
+table.data-table.notable-race-table tbody tr td.horse-name-cell {
+  width: auto;
+  font-weight: 500;
+}
+
+table.data-table.notable-race-table tbody tr td.horse-jockey-cell {
+  width: 25%;
+  min-width: 88px;
+  color: #767676;
+  font-size: 0.95em;
+}
+
+table.data-table.notable-race-table tbody tr td.horse-chips-cell {
+  width: auto;
+  text-align: right;
+}
+
+table.data-table.notable-race-table tbody tr td.horse-chips-cell .chips {
+  justify-content: flex-end;
 }

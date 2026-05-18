@@ -13,7 +13,16 @@ function formatDateWithDow(yyyymmdd) {
   const dd = +yyyymmdd.slice(6, 8);
   const d = new Date(yyyy, mm - 1, dd);
   const dow = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
-  return `${yyyy}.${String(mm).padStart(2, '0')}.${String(dd).padStart(2, '0')} (${dow})`;
+  return `${yyyy}/${String(mm).padStart(2, '0')}/${String(dd).padStart(2, '0')}(${dow})`;
+}
+
+function formatDateShort(yyyymmdd) {
+  const yyyy = +yyyymmdd.slice(0, 4);
+  const mm = +yyyymmdd.slice(4, 6);
+  const dd = +yyyymmdd.slice(6, 8);
+  const d = new Date(yyyy, mm - 1, dd);
+  const dow = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+  return `${mm}/${dd}(${dow})`;
 }
 
 const SURFACE_META = {
@@ -27,31 +36,31 @@ function placeAnchorId(place) {
   return `place-${encodeURIComponent(place)}`;
 }
 
-function renderSurfaceHeader(place, surface, c) {
+function renderSurfaceHeader(place, surface, c, prevDate) {
   const meta = SURFACE_META[surface] || { cls: "" };
   const combo = (FRAME_PREFIX[c["内外"]] || c["内外"]) + c["脚質"];
   return `<div class="surface-header">
     <span class="surface-tag ${meta.cls}">${surface}</span>
-    <br><span class="best-combo">前日のバイアス:<br><b>${combo}</b><small>※複勝率 ${pct(c["複勝率"])}（${c["出走数"]}頭）</small></span>
+    <br><span class="best-combo">前開催日、${formatDateShort(prevDate)}のバイアス:<br><b>${combo}</b><small>※複勝率 ${pct(c["複勝率"])}（${c["出走数"]}頭）</small></span>
   </div>`;
 }
 
-function renderHeadlines(place, surfaces) {
+function renderHeadlines(place, surfaces, prevDate) {
   if (!surfaces || Object.keys(surfaces).length === 0) {
-    return '<p class="result-headline">前日データなし。</p>';
+    return '<p class="result-headline">前開催日データなし。</p>';
   }
   let html = '';
   for (const surface of ['芝', 'ダート']) {
     const c = surfaces[surface];
     if (!c) continue;
-    html += renderSurfaceHeader(place, surface, c);
+    html += renderSurfaceHeader(place, surface, c, prevDate);
   }
-  html += '<p class="result-lead">を、きょうの結果に当ててみると...</p>';
+  html += '<p class="result-lead">を、当日の結果に当ててみると...</p>';
   return html;
 }
 
 function renderPlace(p) {
-  const headlines = renderHeadlines(p.place, p.surfaces);
+  const headlines = renderHeadlines(p.place, p.surfaces, p.prev_date);
 
   let rows = '';
   for (const race of p.races) {
@@ -61,8 +70,11 @@ function renderPlace(p) {
     const hitByRank = {};
     for (const h of (race.hits || [])) hitByRank[h["着順"]] = h;
     for (const rank of [1, 2, 3]) {
+      const raceNameHtml = (rank === 1 && race.race_name)
+        ? `<span class="race-name">${race.race_name}</span>`
+        : '';
       const rcell = rank === 1
-        ? `<td class="race-cell" rowspan="3"><span class="race-no">${race.R}R</span><small> ${race.surface}</small></td>`
+        ? `<td class="race-cell" rowspan="3">${raceNameHtml}<span class="race-no">${race.R}R</span><small> ${race.surface}</small></td>`
         : '';
       const h = hitByRank[rank];
       const numEl = h && h["馬番"] != null ? `<span class="horse-num">${h["馬番"]}</span>` : '';
@@ -132,12 +144,25 @@ async function init() {
   if (cta) cta.hidden = false;
 
   kekkaItems.sort((a, b) => b.date.localeCompare(a.date));
-  const latest = kekkaItems[0];
 
-  $('#date-display').textContent = formatDateWithDow(latest.date);
+  // ?date=YYYYMMDD で過去日指定。未指定なら最新。
+  const params = new URLSearchParams(window.location.search);
+  const requestedDate = params.get('date');
+  let target;
+  if (requestedDate) {
+    target = kekkaItems.find(it => it.date === requestedDate);
+    if (!target) {
+      $('#report').innerHTML = `<p class="loading">${requestedDate} の結果データはありません。</p>`;
+      return;
+    }
+  } else {
+    target = kekkaItems[0];
+  }
+
+  $('#date-display').textContent = formatDateWithDow(target.date);
 
   try {
-    const data = await fetchJSON(`data/${latest.filename}`);
+    const data = await fetchJSON(`data/${target.filename}`);
     renderResult(data);
   } catch (e) {
     $('#report').innerHTML = `<p class="loading">読み込みエラー: ${e.message}</p>`;

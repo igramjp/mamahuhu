@@ -3,14 +3,26 @@ name: Daily Scrape
 on:
   schedule:
     # 土日18時JST = 09:00 UTC に実行(realtime取得、当日分)
-    # 最終Rが16:30前後で終わってから1時間〜90分後 = 通過順反映が間に合えば
-    # 通過順から脚質を計算、未反映なら前走脚質fallbackで補完。
+    # 最終Rが16:30前後で終わってから1時間〜90分後。realtime/dbともに脚質は
+    # 前走から算出するため、bias計算は同じ結果になる。
     - cron: '0 9 * * SAT,SUN'
-    # 火曜18時JST = 火曜09:00 UTC → 前週末分を db.netkeiba.com から取り直す
-    # (realtime取得時に通過順未反映で前走脚質fallbackを使った場合に、火曜の
-    # 正データで上書きしてバイアス計算を確定させる)
-    - cron: '0 9 * * TUE'
-  workflow_dispatch:  # 月曜祝日開催等は手動実行
+    # 金曜18時JST = 金曜09:00 UTC → 直近開催日(=前週日曜)JSONの notable_race のみ
+    # 埋め直し。日曜scrape時点では翌週末の出馬表が未公開で None のままなので、
+    # 翌日(土)の出馬表が出揃った金曜夕方に取得する。
+    - cron: '0 9 * * FRI'
+  # 手動実行: mode=weekend(当日realtime)/rebuild(前週末をdbで取り直し)/notable(翌週末出馬表)
+  # 月曜祝日開催等は weekend、realtime取得が壊れた場合は rebuild。
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '実行モード'
+        default: 'weekend'
+        required: true
+        type: choice
+        options:
+          - weekend
+          - rebuild
+          - notable
 
 jobs:
   scrape:
@@ -34,23 +46,31 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run scraper (weekend realtime)
-        if: github.event.schedule != '0 9 * * TUE'
+        if: github.event.schedule == '0 9 * * SAT,SUN' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'weekend')
         run: |
-          # 土日18時JSTに当日分をrealtime取得。
+          # 当日分をrealtime取得。
           # target_date を渡すことで scrape.py がリアルタイム側(race.netkeiba.com)
           # を使う。db.netkeiba.com は当週分の反映が火曜頃なので当日はこちら。
           TARGET_DATE=$(TZ=Asia/Tokyo date +%Y%m%d)
           python scraper/scrape.py "$TARGET_DATE"
 
-      - name: Run scraper (Tuesday db rebuild)
-        if: github.event.schedule == '0 9 * * TUE'
+      - name: Run scraper (db rebuild, manual)
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'rebuild'
         run: |
-          # 火曜18時JST。db.netkeiba.com に正データが入っているので前週末分を
-          # 取り直す。3日前(=土), 2日前(=日) を db 経路で再取得 → realtime版を上書き。
+          # 手動rebuild: realtime取得が壊れた/取りこぼした時のfallback。
+          # 前週末分(直近の土・日)を db.netkeiba.com から取り直して上書き。
+          # 現状はbias計算が両経路で同等なので定期実行は不要。
           SAT=$(TZ=Asia/Tokyo date -d '3 days ago' +%Y%m%d)
           SUN=$(TZ=Asia/Tokyo date -d '2 days ago' +%Y%m%d)
           python scraper/scrape.py "$SAT"
           python scraper/scrape.py "$SUN"
+
+      - name: Run scraper (notable_race update)
+        if: github.event.schedule == '0 9 * * FRI' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'notable')
+        run: |
+          # 直近開催日(=前週日曜)のJSONを開き、翌日(土)の出馬表が
+          # 公開されていれば notable_race を埋め直す。全レース再scrape はしない。
+          python scraper/scrape.py --notable-only
 
       - name: Commit and push
         run: |

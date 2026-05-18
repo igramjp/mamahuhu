@@ -122,9 +122,23 @@ def get_result(race_id):
     distance = int(dist_m.group(1)) if dist_m else None
     condition = next((c for c in ["不良", "稍重", "重", "良"] if c in info_text), None)
 
+    # レース名: db.netkeiba は data_intro 内 <h1> もしくは racedata 内
+    name_tag = (soup.select_one("div.data_intro h1")
+                or soup.select_one("dl.racedata h1")
+                or soup.select_one("h1.race_name"))
+    race_name = name_tag.get_text(strip=True) if name_tag else None
+
     df["コース"] = course
     df["距離"] = distance
     df["馬場"] = condition
+    df["レース名"] = race_name
+
+    # 前走脚質も付与。realtime経路と同じ列を持たせることで、
+    # bias計算と注目レース(entryも前走脚質)のchip判断の意味を揃える。
+    zenso = _fetch_zenso_styles(race_id)
+    df["脚質_前走"] = pd.to_numeric(df["馬番"], errors="coerce").map(
+        lambda b: zenso.get(int(b)) if pd.notna(b) else None
+    )
     return df
 
 
@@ -160,6 +174,122 @@ def get_race_ids_realtime(yyyymmdd, place):
     return sorted(ids)
 
 
+def fetch_main_race_entries(race_id):
+    """11R(注目レース)の出馬表を shutuba_past.html から全頭抽出。
+    {race_name, surface, entries:[{枠,馬番,馬名,騎手,内外,脚質}]} を返す。
+    脚質は各馬の前走通過順から推定(直近5走の総合ラベルではない)。
+    取れない(出馬表未公開等)場合は None。"""
+    url = f"https://race.netkeiba.com/race/shutuba_past.html?race_id={race_id}&rf=shutuba_submenu"
+    r = requests.get(url, headers=HEADERS, timeout=20)
+    r.encoding = "EUC-JP"
+    soup = BeautifulSoup(r.text, "html.parser")
+    table = soup.select_one("table.Shutuba_Past5_Table")
+    if not table:
+        return None
+
+    entries = []
+    for row in table.find_all("tr")[1:]:
+        cells = row.find_all(["th", "td"])
+        if len(cells) < 6:
+            continue
+        try:
+            waku = int(cells[0].get_text(strip=True))
+            umaban = int(cells[1].get_text(strip=True))
+        except ValueError:
+            continue
+        horse_a = cells[3].select_one(".Horse02 a")
+        horse_name = horse_a.get_text(strip=True) if horse_a else ""
+        jockey_a = cells[4].select_one("a")
+        jockey = jockey_a.get_text(strip=True) if jockey_a else ""
+        style = _style_from_zenso_cell(cells[5])
+        if not horse_name:
+            continue
+        entries.append({
+            "枠": waku,
+            "馬番": umaban,
+            "馬名": horse_name,
+            "騎手": jockey,
+            "内外": "内" if waku <= 4 else "外",
+            "脚質": style,
+        })
+
+    if not entries:
+        return None
+
+    name_tag = soup.select_one(".RaceName")
+    race_name = name_tag.get_text(strip=True) if name_tag else None
+    info_tag = soup.select_one("div.RaceData01")
+    info_text = info_tag.get_text(" ", strip=True) if info_tag else ""
+    if "芝" in info_text:
+        surface = "芝"
+    elif "ダ" in info_text:
+        surface = "ダート"
+    else:
+        surface = None
+
+    entries.sort(key=lambda e: e["馬番"])
+    return {"race_name": race_name, "surface": surface, "entries": entries}
+
+
+_NEXT_KAISAI_CACHE = {}
+
+
+def find_next_kaisai_date(from_date, place, max_forward=7):
+    """from_date(YYYYMMDD)より後で最初に開催のある日とそのrace_idsを返す。
+    なければ (None, [])。最大 max_forward 日先まで探索。"""
+    try:
+        base = datetime.strptime(from_date, "%Y%m%d").date()
+    except ValueError:
+        return None, []
+    for i in range(1, max_forward + 1):
+        d = (base + timedelta(days=i)).strftime("%Y%m%d")
+        key = (d, place)
+        if key in _NEXT_KAISAI_CACHE:
+            ids = _NEXT_KAISAI_CACHE[key]
+        else:
+            try:
+                ids = get_race_ids_realtime(d, place)
+            except Exception:
+                ids = []
+            _NEXT_KAISAI_CACHE[key] = ids
+            time.sleep(0.5)
+        if ids:
+            return d, ids
+    return None, []
+
+
+def build_notable_race(from_date, place):
+    """from_date より後の最初の開催日の 11R を取得して notable_race dict を返す。
+    取れなければ None。"""
+    next_date, ids = find_next_kaisai_date(from_date, place)
+    if not next_date:
+        return None
+    rid_11 = next((rid for rid in ids if rid.endswith("11")), None)
+    if not rid_11:
+        return None
+    try:
+        info = fetch_main_race_entries(rid_11)
+    except Exception as e:
+        print(f"  [{place}] 注目レース取得失敗: {str(e)[:100]}")
+        return None
+    if not info:
+        return None
+    info["date"] = next_date
+    info["R"] = 11
+    return info
+
+
+def _style_from_zenso_cell(cell):
+    """馬柱の前走セルから脚質を推定。通過順 "2-5-5" + "16頭" を読み derive_style に渡す。
+    直線/障害(コーナー無し)や前走なしは None。"""
+    text = cell.get_text(" | ", strip=True)
+    m_pass = re.search(r"(\d+(?:-\d+){1,4})\s*\(\s*\d+\.\d+\s*\)", text)
+    m_head = re.search(r"(\d+)頭", text)
+    if not m_pass or not m_head:
+        return None
+    return derive_style(m_pass.group(1), int(m_head.group(1)))
+
+
 def _fetch_zenso_styles(race_id):
     """馬柱(5走表示)ページから各馬の前走脚質を推定。
     realtime結果ページの "コーナー通過順" はレース終了直後だと未反映で空のことが
@@ -182,14 +312,7 @@ def _fetch_zenso_styles(race_id):
             umaban = int(cells[1].get_text(strip=True))
         except ValueError:
             continue
-        zenso_text = cells[5].get_text(" | ", strip=True)
-        # 通過: "2-5-5" or "1-1-1-1" 等。直線/障害は "コーナー無し" などになり該当しない。
-        m_pass = re.search(r"(\d+(?:-\d+){1,4})\s*\(\s*\d+\.\d+\s*\)", zenso_text)
-        m_head = re.search(r"(\d+)頭", zenso_text)
-        if not m_pass or not m_head:
-            out[umaban] = None
-            continue
-        out[umaban] = derive_style(m_pass.group(1), int(m_head.group(1)))
+        out[umaban] = _style_from_zenso_cell(cells[5])
     return out
 
 
@@ -239,9 +362,13 @@ def get_result_realtime(race_id):
     raw = m.group(1) if m else None
     condition = {"稍": "稍重"}.get(raw, raw)
 
+    name_tag = soup.select_one(".RaceName")
+    race_name = name_tag.get_text(strip=True) if name_tag else None
+
     df["コース"] = course
     df["距離"] = distance
     df["馬場"] = condition
+    df["レース名"] = race_name
 
     # realtime結果ページの通過順は反映タイミングが安定しない(土曜18時=未反映、
     # 日曜18時=一部反映 などSat/Sunで挙動が変わる)。一貫性のため realtime
@@ -298,10 +425,16 @@ def analyze_to_dict(df, place, yyyymmdd, source="db"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["上り"] = pd.to_numeric(df["上り"], errors="coerce")
     df = df.dropna(subset=["着順", "枠番", "人気"])
+    # 騎手の評価記号(▲★△等)を集計前に剥がす。realtimeソースだと同一騎手が
+    # 減量印付き/無しで2行に分裂し hot_jockeys が別エントリで二重計上される。
+    if "騎手" in df.columns:
+        df["騎手"] = df["騎手"].apply(
+            lambda x: _normalize_jockey_name(x) if pd.notna(x) else x
+        )
     df["頭数"] = df.groupby("race_id")["馬番"].transform("count")
-    # realtime取得時は "脚質_前走" 列が常に付与されている。これを脚質として採用し、
-    # 当日通過順の反映タイミング差(Sat/Sunで一部入る/入らない)による分析揺れを避ける。
-    # 火曜rebuild(db経路)では "脚質_前走" 列がないので通過順から計算する。
+    # realtime/db両経路で "脚質_前走" 列を付与しており、これを脚質として採用する。
+    # 注目レースのentryも前走脚質ベースなので、bias計算と意味が揃いchip判断が
+    # 一貫する(rebuild時に当該レースの通過順を使うと、entry側=前走と意味がズレる)。
     if "脚質_前走" in df.columns:
         df["脚質"] = df["脚質_前走"]
     else:
@@ -425,6 +558,11 @@ def per_race_top3(df):
     for rid, group in df.groupby("race_id"):
         race_no = int(str(rid)[-2:])
         surface = str(group["コース"].iloc[0]) if len(group) else "?"
+        race_name = None
+        if "レース名" in group.columns:
+            rn = group["レース名"].iloc[0]
+            if pd.notna(rn) and rn:
+                race_name = str(rn)
         top3 = group[group["着順"].isin([1, 2, 3])].sort_values("着順")
         top3_data = []
         for _, row in top3.iterrows():
@@ -435,7 +573,12 @@ def per_race_top3(df):
                 "脚質": str(row["脚質"]) if pd.notna(row["脚質"]) else None,
                 "騎手": str(row["騎手"]) if pd.notna(row["騎手"]) else None,
             })
-        races.append({"R": race_no, "surface": surface, "top3": top3_data})
+        races.append({
+            "R": race_no,
+            "surface": surface,
+            "race_name": race_name,
+            "top3": top3_data,
+        })
     races.sort(key=lambda x: x["R"])
     return races
 
@@ -510,6 +653,14 @@ def process_place(place, target_date=None):
 
     df = pd.concat(dfs, ignore_index=True)
     analysis = analyze_to_dict(df, place, yyyymmdd, source=new_source)
+
+    nr = build_notable_race(yyyymmdd, place)
+    if nr:
+        analysis["notable_race"] = nr
+        print(f"[{place}] 注目レース: {nr['date']} 11R "
+              f"({nr.get('race_name') or '?'}, {len(nr['entries'])}頭)")
+    else:
+        print(f"[{place}] 注目レース: 翌開催日の出馬表未公開のためスキップ")
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
@@ -611,7 +762,12 @@ def _build_kekka_for_place(today_data, prev_data, hot_jockey_names):
                 "馬番": horse.get("馬番"),
                 "labels": labels,
             })
-        races_out.append({"R": race["R"], "surface": surface, "hits": hits})
+        races_out.append({
+            "R": race["R"],
+            "surface": surface,
+            "race_name": race.get("race_name"),
+            "hits": hits,
+        })
 
     return {
         "place": today_data["place"],
@@ -697,9 +853,65 @@ def build_kekka(target_date):
     print(f"\n結果: {out_path.name} ({len(places_out)}場)")
 
 
+def _find_latest_kaisai_date():
+    """public/data 内で最も新しい開催日(YYYYMMDD)を返す。なければ None。
+    結果ファイル(_結果.json)は除外。"""
+    candidates = set()
+    for f in DATA_DIR.glob("*.json"):
+        if f.name == "index.json":
+            continue
+        m = re.match(r"(\d{8})_(.+)\.json", f.name)
+        if not m or m.group(2) == "結果":
+            continue
+        candidates.add(m.group(1))
+    return max(candidates) if candidates else None
+
+
+def update_notable_races(target_date=None):
+    """target_date(未指定なら直近開催日)の各場JSONについて、notable_race だけ
+    再取得して上書きする。金曜18時JST想定: 翌日(土)の出馬表は公開済みなので、
+    日曜scrape時点で None だった notable_race を埋め直せる。"""
+    if not target_date:
+        target_date = _find_latest_kaisai_date()
+        if not target_date:
+            print("対象データなし")
+            return
+    print(f"\n=== notable_race 更新: {target_date} ===")
+    updated = 0
+    for f in sorted(DATA_DIR.glob(f"{target_date}_*.json")):
+        m = re.match(rf"{target_date}_(.+)\.json", f.name)
+        if not m or m.group(1) == "結果":
+            continue
+        place = m.group(1)
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"  [{place}] 読み込みエラー: {e}")
+            continue
+        nr = build_notable_race(target_date, place)
+        if not nr:
+            print(f"  [{place}] 注目レース: 取れず(出馬表未公開?)、スキップ")
+            continue
+        data["notable_race"] = nr
+        data["generated_at"] = datetime.now().isoformat(timespec="seconds")
+        with open(f, "w", encoding="utf-8") as out:
+            json.dump(data, out, ensure_ascii=False, indent=2)
+        print(f"  [{place}] 注目レース更新: {nr['date']} 11R ({nr.get('race_name') or '?'})")
+        updated += 1
+        time.sleep(SLEEP_BETWEEN_PLACES)
+    print(f"\n完了: {updated}場更新")
+
+
 def main():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    target_date = sys.argv[1] if len(sys.argv) > 1 else None
+    args = sys.argv[1:]
+    if "--notable-only" in args:
+        args.remove("--notable-only")
+        target_date = args[0] if args else None
+        update_notable_races(target_date)
+        update_index()
+        return
+    target_date = args[0] if args else None
     if target_date:
         print(f"対象日付: {target_date}")
 
