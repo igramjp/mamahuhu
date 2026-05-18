@@ -124,7 +124,7 @@ function notableRaceHtml(nr, surfaces, hotJockeysAllPlaces) {
       chips.push(`<span class="chip chip-hit">${e["脚質"]}</span>`);
     }
     if (e["騎手"] && jockeyInHotSet(e["騎手"], hotNames)) {
-      chips.push(`<span class="chip chip-hit">${e["騎手"]}</span>`);
+      chips.push(`<span class="chip">${e["騎手"]}</span>`);
     }
     const chipsHtml = chips.length > 0 ? `<div class="chips">${chips.join('')}</div>` : '';
     rows += `<tr>
@@ -137,7 +137,7 @@ function notableRaceHtml(nr, surfaces, hotJockeysAllPlaces) {
 
   return `<section class="section" id="notable-race">
     <h2 class="section-head">注目レース</h2>
-    <p class="section-sub">翌開催日、${formatDateShort(nr.date)}のメイン(11R)出馬表。<br>当日のバイアス・好調騎手に該当する馬を探してみると...</p>
+    <p class="section-sub">翌開催日、${formatDateShort(nr.date)}のメインレース「${nr.race_name}」の出馬表。<br>当日のバイアスに該当する馬を探してみると...</p>
     <div class="notable-race-head">
       <span class="surface-tag ${meta.cls}">${nr.surface || ''}</span>
       ${raceNameHtml}

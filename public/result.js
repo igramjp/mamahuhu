@@ -55,7 +55,7 @@ function renderHeadlines(place, surfaces, prevDate) {
     if (!c) continue;
     html += renderSurfaceHeader(place, surface, c, prevDate);
   }
-  html += '<p class="result-lead">を、当日の結果に当ててみると...</p>';
+  html += '<p class="result-lead">を、当日の結果と照らし合わせてみると...</p>';
   return html;
 }
 
