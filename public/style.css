@@ -91,7 +91,8 @@ header h1 {
   right: 0;
   margin: auto;
   width: 100%;
-  height: calc(100vh - 345px);
+  height: calc(100vh - 345px); /* fallback */
+  height: calc(100svh - 345px); /* iOS Safari */
   max-width: 660px;
   display: flex;
   justify-content: center;
@@ -103,7 +104,8 @@ header h1 {
   position: relative;
   width: calc(100% - 44px);
   height: auto;
-  max-height: calc(100dvh - 345px);
+  max-height: calc(100vh - 345px); /* fallback */
+  max-height: calc(100svh - 345px); /* iOS Safari */
   object-fit: contain;
 }
 
@@ -734,11 +736,12 @@ table.data-table.notable-race-table tbody tr td.horse-num-cell {
 table.data-table.notable-race-table tbody tr td.horse-name-cell {
   width: auto;
   font-weight: 500;
+  min-width: 162px;
 }
 
 table.data-table.notable-race-table tbody tr td.horse-jockey-cell {
-  width: 25%;
-  min-width: 88px;
+  width: auto;
+  min-width: 48px;
   color: #767676;
   font-size: 0.95em;
 }
