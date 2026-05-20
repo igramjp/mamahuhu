@@ -577,7 +577,7 @@ article.content ul {
 
 /* どうだった ページ */
 section.lede.lede-compact {
-  min-height: auto;
+  height: auto !important;
   padding-bottom: 33px;
 }
 
