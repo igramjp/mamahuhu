@@ -42,7 +42,12 @@ body {
   scrollbar-gutter: stable both-edges;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   display: inline-block;
   font-family: "Dela Gothic One", sans-serif;
   font-size: 1.75em;
@@ -91,8 +96,10 @@ header h1 {
   right: 0;
   margin: auto;
   width: 100%;
-  height: calc(100vh - 345px); /* fallback */
-  height: calc(100svh - 345px); /* iOS Safari */
+  height: calc(100vh - 345px);
+  /* fallback */
+  height: calc(100svh - 345px);
+  /* iOS Safari */
   max-width: 660px;
   display: flex;
   justify-content: center;
@@ -103,9 +110,10 @@ header h1 {
   overflow: hidden;
   position: relative;
   width: calc(100% - 44px);
-  height: auto;
-  max-height: calc(100vh - 345px); /* fallback */
-  max-height: calc(100svh - 345px); /* iOS Safari */
+  height: calc(100vh - 345px);
+  /* fallback */
+  height: calc(100svh - 345px);
+  /* iOS Safari */
   object-fit: contain;
 }
 
@@ -225,8 +233,7 @@ section.lede {
   overflow: hidden;
   position: relative;
   width: 100%;
-  height: auto;
-  min-height: calc(100dvh - 88px);
+  height: calc(100vh - 88px);
   padding: 0 22px;
 }
 
@@ -380,7 +387,7 @@ section.section {
   top: -16.5px;
 }
 
-.surface-tag  {
+.surface-tag {
   overflow: hidden;
   position: relative;
   display: inline-block;
