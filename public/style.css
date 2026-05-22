@@ -1,45 +1,44 @@
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 a,
 a:visited,
 a:hover,
 a:active {
-  color: inherit;
+    color: inherit;
 }
 
 html {
-  font-size: 62.5%;
-  width: 100%;
-  height: 100%;
-  scroll-behavior: smooth;
+    font-size: 62.5%;
+    width: 100%;
+    height: 100%;
+    scroll-behavior: smooth;
 }
 
-
 body {
-  position: relative;
-  overflow: visible;
-  width: 100%;
-  min-block-size: 100dvh;
-  inline-size: 100%;
-  background: #fff;
-  color: #2f2f2f;
-  font-family: "Noto Sans JP", sans-serif;
-  font-size: 1.6rem;
-  font-weight: 400;
-  font-feature-settings: "palt" 1;
-  font-variant-east-asian: proportional-width;
-  font-synthesis: none;
-  line-height: normal;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-size-adjust: 100%;
-  -webkit-text-size-adjust: 100%;
-  color-scheme: light;
-  scrollbar-gutter: stable both-edges;
+    position: relative;
+    overflow: visible;
+    width: 100%;
+    min-block-size: 100dvh;
+    inline-size: 100%;
+    background: #fff;
+    color: #2f2f2f;
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 1.6rem;
+    font-weight: 400;
+    font-feature-settings: "palt" 1;
+    font-variant-east-asian: proportional-width;
+    font-synthesis: none;
+    line-height: normal;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+    color-scheme: light;
+    scrollbar-gutter: stable both-edges;
 }
 
 h1,
@@ -48,716 +47,723 @@ h3,
 h4,
 h5,
 h6 {
-  display: inline-block;
-  font-family: "Dela Gothic One", sans-serif;
-  font-size: 1.75em;
-  font-weight: 400;
-  transform: scale(0.82, 1.18);
-  transform-origin: left center;
-  transform-box: fill-box;
+    display: inline-block;
+    font-family: "Dela Gothic One", sans-serif;
+    font-size: 1.75em;
+    font-weight: 400;
+    transform: scale(0.82, 1.18);
+    transform-origin: left center;
+    transform-box: fill-box;
 }
 
 strong {
-  font-weight: 900;
+    font-weight: 900;
 }
 
 header {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: 88px;
-  background: transparent;
-  color: #2f2f2f;
-  padding: 0 22px;
-  display: flex;
-  align-items: center;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: 88px;
+    background: transparent;
+    color: #2f2f2f;
+    padding: 0 22px;
+    display: flex;
+    align-items: center;
 }
 
 header h1 {
-  display: block !important;
-  transform: scale(1, 1) !important;
-  transform-origin: center center !important;
-  transform-box: fill-box !important;
+    display: block !important;
+    transform: scale(1, 1) !important;
+    transform-origin: center center !important;
+    transform-box: fill-box !important;
 }
 
 .logo {
-  display: block;
-  overflow: hidden;
-  position: relative;
-  width: auto;
-  height: 55px;
+    display: block;
+    overflow: hidden;
+    position: relative;
+    width: auto;
+    height: 55px;
 }
 
 .results-summary {
-  overflow: hidden;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  margin: auto;
-  width: 100%;
-  height: calc(100vh - 345px);
-  /* fallback */
-  height: calc(100svh - 345px);
-  /* iOS Safari */
-  max-width: 660px;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
+    overflow: hidden;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: auto;
+    width: 100%;
+    height: calc(100vh - 345px);
+    /* fallback */
+    height: calc(100svh - 345px);
+    /* iOS Safari */
+    max-width: 660px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
 }
 
 .results-summary img {
-  overflow: hidden;
-  position: relative;
-  width: calc(100% - 44px);
-  height: calc(100vh - 345px);
-  /* fallback */
-  height: calc(100svh - 345px);
-  /* iOS Safari */
-  object-fit: contain;
+    overflow: hidden;
+    position: relative;
+    width: calc(100% - 44px);
+    height: calc(100vh - 345px);
+    /* fallback */
+    height: calc(100svh - 345px);
+    /* iOS Safari */
+    object-fit: contain;
 }
 
 .masthead-inner {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  max-width: 660px;
-  margin: 0 auto;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-width: 660px;
+    margin: 0 auto;
 }
 
 main {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
 }
 
 .link-button {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  background: #d0d0d0;
-  padding: 0 22px 27.5px 22px;
-  text-align: center;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    background: #d0d0d0;
+    padding: 0 22px 27.5px 22px;
+    text-align: center;
 }
 
 .link-button a {
-  display: block;
-  width: 100%;
-  max-width: 660px;
-  height: 66px;
-  margin: 0 auto;
-  background: #767676;
-  color: #fff;
-  border-radius: 16.5px;
-  border: none;
-  text-decoration: none;
-  text-align: center;
+    display: block;
+    width: 100%;
+    max-width: 660px;
+    height: 66px;
+    margin: 0 auto;
+    background: #767676;
+    color: #fff;
+    border-radius: 16.5px;
+    border: none;
+    text-decoration: none;
+    text-align: center;
 }
 
 .link-button a span {
-  display: inline-block;
-  width: 100%;
-  height: 100%;
-  line-height: 64px;
-  color: #fff;
-  font-family: "Dela Gothic One", sans-serif;
-  font-size: 3rem;
-  font-weight: 700;
-  transform: scale(0.82, 1.18);
-  transform-origin: center center;
-  transform-box: fill-box;
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+    line-height: 64px;
+    color: #fff;
+    font-family: "Dela Gothic One", sans-serif;
+    font-size: 3rem;
+    font-weight: 700;
+    transform: scale(0.82, 1.18);
+    transform-origin: center center;
+    transform-box: fill-box;
 }
 
 .link-button a:hover {
-  background: #2f2f2f;
+    background: #2f2f2f;
 }
 
 .link-button a:hover span {
-  color: #fff;
+    color: #fff;
 }
 
 footer {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  background: #2f2f2f;
-  color: #d0d0d0;
-  text-align: center;
-  padding: 16.5px 0;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    background: #2f2f2f;
+    color: #d0d0d0;
+    text-align: center;
+    padding: 16.5px 0;
 }
 
 .nav-links {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.9375em;
-  margin-bottom: 11px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.9375em;
+    margin-bottom: 11px;
 }
 
 .nav-links a {
-  font-size: 0.9375em;
-  font-weight: 500;
-  line-height: 1.5;
+    font-size: 0.9375em;
+    font-weight: 500;
+    line-height: 1.5;
 }
 
 .copyright {
-  font-size: 1.28rem;
-  font-weight: 700;
-  line-height: 1.5;
-  padding: 0.5px 0 2.3px 0;
+    font-size: 1.28rem;
+    font-weight: 700;
+    line-height: 1.5;
+    padding: 0.5px 0 2.3px 0;
 }
 
 .report {
-  overflow: visible;
-  position: relative;
-  width: 100%;
-  height: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: #d0d0d0;
-  padding: 55px 22px 38.5px 22px;
-  gap: 55px;
+    overflow: visible;
+    position: relative;
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #d0d0d0;
+    padding: 55px 22px 38.5px 22px;
+    gap: 55px;
 }
 
 section.lede {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: calc(100vh - 88px);
-  padding: 0 22px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 88px);
+    padding: 0 22px;
 }
 
 .lede-text,
 .lede-meaning {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  max-width: 660px;
-  margin: 0 auto;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-width: 660px;
+    margin: 0 auto;
 }
 
 .control-bar {
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  height: auto;
-  max-width: 660px;
-  margin: 0 auto;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: auto;
+    max-width: 660px;
+    margin: 0 auto;
 }
 
 .date-display {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  max-width: 660px;
-  margin: 22px auto 0 auto;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-width: 660px;
+    margin: 22px auto 0 auto;
 }
 
 .date-display span {
-  display: inline-block;
-  font-family: "Dela Gothic One", sans-serif;
-  font-size: 1.25em;
-  font-weight: 400;
-  line-height: 1.5;
-  transform: scale(0.82, 1.18);
-  transform-origin: left center;
-  transform-box: fill-box;
+    display: inline-block;
+    font-family: "Dela Gothic One", sans-serif;
+    font-size: 1.25em;
+    font-weight: 400;
+    line-height: 1.5;
+    transform: scale(0.82, 1.18);
+    transform-origin: left center;
+    transform-box: fill-box;
 }
 
 .buttons-container {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  max-width: 660px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 5.5px;
-  margin-top: 11px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-width: 660px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 5.5px;
+    margin-top: 11px;
 }
 
 .place-tabs {
-  overflow: hidden;
-  position: relative;
-  width: max-content;
-  min-width: 137.5px;
-  height: auto;
-  display: flex;
-  gap: 11px;
+    overflow: hidden;
+    position: relative;
+    width: max-content;
+    min-width: 137.5px;
+    height: auto;
+    display: flex;
+    gap: 11px;
 }
 
 #surface-buttons {
-  justify-content: flex-end;
+    justify-content: flex-end;
 }
 
 .place-buttons {
-  overflow: hidden;
-  position: relative;
-  width: max-content;
-  height: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5.5px;
+    overflow: hidden;
+    position: relative;
+    width: max-content;
+    height: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5.5px;
 }
 
 .place-btn {
-  overflow: hidden;
-  position: relative;
-  width: max-content;
-  min-width: 66px;
-  height: 44px;
-  line-height: 44px;
-  padding: 0;
-  background: #d0d0d0;
-  color: #2f2f2f;
-  font-size: 1.6rem;
-  font-weight: 700;
-  line-height: 44px;
-  border-radius: 11px;
-  border: none;
-  cursor: pointer;
-  text-align: center;
-  text-decoration: none;
+    overflow: hidden;
+    position: relative;
+    width: max-content;
+    min-width: 66px;
+    height: 44px;
+    line-height: 44px;
+    padding: 0;
+    background: #d0d0d0;
+    color: #2f2f2f;
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 44px;
+    border-radius: 11px;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
 }
 
 .place-btn.active,
 .place-btn:hover {
-  background: #2f2f2f;
-  color: #fff;
+    background: #2f2f2f;
+    color: #fff;
 }
 
 section.section {
-  overflow: visible;
-  position: relative;
-  width: 100%;
-  max-width: 660px;
-  height: auto;
-  margin: 0 auto;
-  padding: 27.5px 27.5px 44px 27.5px;
-  border-radius: 33px;
-  background: #fff;
-  scroll-margin-top: 44px;
-}
-
-.section-head {
-  overflow: visible;
-  position: relative;
-  width: max-content;
-  height: auto;
-  top: -44px;
-  left: -44px;
-  background: #2f2f2f;
-  color: #fff;
-  font-size: 2em;
-  padding: 2.36px 27.5px 4.36px 27.5px;
-  line-height: 1.5;
-  border-radius: 16.5px;
-}
-
-.section-sub {
-  position: relative;
-  top: -27.5px;
-}
-
-.surface-header {
-  position: relative;
-  top: -5.5px;
-}
-
-.result-report .surface-header {
-  top: 0;
-}
-
-.result-report .surface-header:first-of-type {
-  top: -16.5px;
-}
-
-.surface-tag {
-  overflow: hidden;
-  position: relative;
-  display: inline-block;
-  width: max-content;
-  height: auto;
-  background: #d0d0d0;
-  color: #2f2f2f;
-  font-family: "Dela Gothic One", sans-serif;
-  font-size: 1.25em;
-  font-weight: 400;
-  transform: scale(0.82, 1.18);
-  transform-origin: left center;
-  transform-box: fill-box;
-  padding: 0 16.5px;
-  line-height: 1.5;
-  border-radius: 11px;
-  margin-bottom: 2.75px;
-  left: -16px;
-}
-
-.best-combo {
-  overflow: hidden;
-  position: relative;
-  display: block;
-  width: 100%;
-  height: auto;
-  text-align: left;
-}
-
-.best-combo b {
-  display: inline-block;
-  font-family: "Dela Gothic One", sans-serif;
-  font-size: 1.5em;
-  font-weight: 400;
-  line-height: 1.25;
-  transform: scale(0.82, 1.18);
-  transform-origin: left center;
-  transform-box: fill-box;
-}
-
-.best-combo small {
-  position: relative;
-  color: #767676;
-  font-size: 0.75em;
-  font-weight: 400;
-  line-height: 1.25;
-  left: -22px;
-  bottom: -1px;
+    overflow: visible;
+    position: relative;
+    width: 100%;
+    max-width: 660px;
+    height: auto;
+    margin: 0 auto;
+    padding: 27.5px 27.5px 44px 27.5px;
+    border-radius: 33px;
+    background: #fff;
+    scroll-margin-top: 44px;
 }
 
 @media (max-width: 420px) {
-  .best-combo small {
-    position: absolute;
-    left: 147px;
-    bottom: 0;
-    white-space: nowrap;
-  }
+    section.section {
+        padding: 27.5px 22px 44px 22px;
+    }
+}
+
+.section-head {
+    overflow: visible;
+    position: relative;
+    width: max-content;
+    height: auto;
+    top: -44px;
+    left: -44px;
+    background: #2f2f2f;
+    color: #fff;
+    font-size: 2em;
+    padding: 2.36px 27.5px 4.36px 27.5px;
+    line-height: 1.5;
+    border-radius: 16.5px;
+}
+
+.section-sub {
+    position: relative;
+    top: -27.5px;
+}
+
+.surface-header {
+    position: relative;
+    top: -5.5px;
+}
+
+.result-report .surface-header {
+    top: 0;
+}
+
+.result-report .surface-header:first-of-type {
+    top: -16.5px;
+}
+
+.surface-tag {
+    overflow: hidden;
+    position: relative;
+    display: inline-block;
+    width: max-content;
+    height: auto;
+    background: #d0d0d0;
+    color: #2f2f2f;
+    font-family: "Dela Gothic One", sans-serif;
+    font-size: 1.25em;
+    font-weight: 400;
+    transform: scale(0.82, 1.18);
+    transform-origin: left center;
+    transform-box: fill-box;
+    padding: 0 16.5px;
+    line-height: 1.5;
+    border-radius: 11px;
+    margin-bottom: 2.75px;
+    left: -16px;
+}
+
+.best-combo {
+    overflow: hidden;
+    position: relative;
+    display: block;
+    width: 100%;
+    height: auto;
+    text-align: left;
+}
+
+.best-combo b {
+    display: inline-block;
+    font-family: "Dela Gothic One", sans-serif;
+    font-size: 1.5em;
+    font-weight: 400;
+    line-height: 1.25;
+    transform: scale(0.82, 1.18);
+    transform-origin: left center;
+    transform-box: fill-box;
+}
+
+.best-combo small {
+    position: relative;
+    color: #767676;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.25;
+    left: -22px;
+    bottom: -1px;
+}
+
+@media (max-width: 420px) {
+    .best-combo small {
+        position: absolute;
+        left: 147px;
+        bottom: 0;
+        white-space: nowrap;
+    }
 }
 
 .sub-head {
-  margin: 22px 0 5.5px 0;
+    margin: 22px 0 5.5px 0;
 }
 
 table.data-table {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  border-collapse: collapse;
-  border-spacing: 0;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    border-collapse: collapse;
+    border-spacing: 0;
 }
 
 table.data-table thead tr:first-child {
-  border-bottom: 3px solid #d0d0d0;
+    border-bottom: 3px solid #d0d0d0;
 }
 
 table.data-table thead tr th {
-  color: #767676;
-  text-align: left;
-  padding: 5.5px 0;
+    color: #767676;
+    text-align: left;
+    padding: 5.5px 0;
 }
 
 table.data-table thead tr th:not(:first-child) {
-  text-align: right;
+    text-align: right;
 }
 
 table.data-table tbody tr {
-  border-bottom: 3px dotted #d0d0d0;
+    border-bottom: 3px dotted #d0d0d0;
 }
 
 table.data-table tbody tr td {
-  font-family: "Yusei Magic", sans-serif;
-  font-size: 1.25em;
-  font-weight: 400;
-  line-height: 1.5;
-  padding: 5.5px 0;
+    font-family: "Yusei Magic", sans-serif;
+    font-size: 1.25em;
+    font-weight: 400;
+    line-height: 1.25;
+    padding: 11px 0;
 }
 
 table.data-table tbody tr td:not(:first-child) {
-  text-align: right;
+    text-align: right;
 }
 
 table.data-table thead tr th:nth-child(2),
 table.data-table tbody tr td:nth-child(2) {
-  width: 20%;
-  min-width: 88px;
+    width: 20%;
+    min-width: 88px;
 }
 
 table.data-table thead tr th:nth-child(3),
 table.data-table tbody tr td:nth-child(3) {
-  width: 15%;
-  min-width: 33px;
+    width: 15%;
+    min-width: 33px;
 }
 
 table.data-table thead tr th:nth-child(4),
 table.data-table thead tr th:nth-child(5),
 table.data-table tbody tr td:nth-child(4),
 table.data-table tbody tr td:nth-child(5) {
-  width: 10%;
-  min-width: 22px;
+    width: 10%;
+    min-width: 22px;
 }
 
 table.data-table.bias-table thead tr th:nth-child(2),
 table.data-table.bias-table thead tr th:nth-child(3),
 table.data-table.bias-table tbody tr td:nth-child(2),
 table.data-table.bias-table tbody tr td:nth-child(3) {
-  width: 15%;
-  min-width: 66px;
+    width: 15%;
+    min-width: 66px;
 }
 
 table.data-table.bias-table thead tr th:nth-child(4),
 table.data-table.bias-table tbody tr td:nth-child(4) {
-  width: 15%;
-  min-width: 55px;
+    width: 15%;
+    min-width: 55px;
 }
 
 main.content-container {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  background: #d0d0d0;
-  padding: 55px 22px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    background: #d0d0d0;
+    padding: 55px 22px;
 }
 
 article.content {
-  overflow: visible;
-  position: relative;
-  width: 100%;
-  height: auto;
-  max-width: 660px;
-  margin: 0 auto;
-  background: #fff;
-  padding: 27.5px;
-  border-radius: 33px;
+    overflow: visible;
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-width: 660px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 27.5px;
+    border-radius: 33px;
 }
 
 article.content h3 {
-  margin-top: 22px;
+    margin-top: 22px;
 }
 
 article.content ul {
-  margin-bottom: 1em;
+    margin-bottom: 1em;
 }
 
 .content-wrapper {
-  overflow: visible;
-  position: relative;
-  width: 100%;
-  height: auto;
-  top: -27.5px;
+    overflow: visible;
+    position: relative;
+    width: 100%;
+    height: auto;
+    top: -27.5px;
 }
 
 .content-wrapper h3 {
-  line-height: 1;
-  margin-bottom: 11px;
+    line-height: 1;
+    margin-bottom: 11px;
 }
 
 .about-image {
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-  aspect-ratio: 8/3;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    aspect-ratio: 8/3;
 }
 
 /* どうだった ページ */
 section.lede.lede-compact {
-  height: auto !important;
-  padding-bottom: 33px;
+    height: auto !important;
+    padding-bottom: 33px;
 }
 
 .result-headline {
-  position: relative;
-  top: -5.5px;
-  margin-bottom: 11px;
-  line-height: 1.6;
+    position: relative;
+    top: -5.5px;
+    margin-bottom: 11px;
+    line-height: 1.6;
 }
 
 .result-lead {
-  margin: 11px 0;
-  line-height: 1.5;
+    margin: 11px 0;
+    line-height: 1.5;
 }
 
 .result-headline b {
-  display: inline-block;
-  font-family: "Dela Gothic One", sans-serif;
-  font-size: 1.5em;
-  font-weight: 400;
-  line-height: 1.25;
-  transform: scale(0.82, 1.18);
-  transform-origin: left center;
-  transform-box: fill-box;
-  margin: 0 8px;
+    display: inline-block;
+    font-family: "Dela Gothic One", sans-serif;
+    font-size: 1.5em;
+    font-weight: 400;
+    line-height: 1.25;
+    transform: scale(0.82, 1.18);
+    transform-origin: left center;
+    transform-box: fill-box;
+    margin: 0 8px;
 }
 
 .chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5.5px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5.5px;
 }
 
 .chip {
-  display: inline-block;
-  background: #d0d0d0;
-  color: #2f2f2f;
-  font-family: "Noto Sans JP", sans-serif;
-  font-size: 0.7em;
-  font-weight: 700;
-  padding: 1.5px 9px 1.5px 9px;
-  border-radius: 8px;
-  vertical-align: middle;
-  line-height: 1.5;
+    display: inline-block;
+    background: #d0d0d0;
+    color: #2f2f2f;
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 0.7em;
+    font-weight: 700;
+    padding: 1.5px 9px 1.5px 9px;
+    border-radius: 8px;
+    vertical-align: middle;
+    line-height: 1.5;
 }
 
 .chip.chip-hit {
-  background: #2f2f2f;
-  color: #fff;
+    background: #2f2f2f;
+    color: #fff;
 }
 
 .chip.chip-miss {
-  background: #fff;
-  color: #767676;
+    background: #fff;
+    color: #767676;
 }
 
 table.data-table.result-table tbody tr:nth-child(3n) {
-  border-bottom: 3px solid #d0d0d0;
+    border-bottom: 3px solid #d0d0d0;
 }
 
 table.data-table.result-table tbody tr td {
-  vertical-align: middle;
+    vertical-align: middle;
 }
 
 .horse-num {
-  display: inline-block;
-  font-family: "Noto Sans JP", sans-serif;
-  font-size: 0.7em;
-  font-weight: 700;
-  border: 1px solid #d0d0d0;
-  color: #2f2f2f;
-  width: 25.4px;
-  height: 25.4px;
-  text-align: center;
-  line-height: 22.4px;
+    display: inline-block;
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 0.7em;
+    font-weight: 700;
+    border: 1px solid #d0d0d0;
+    color: #2f2f2f;
+    width: 25.4px;
+    height: 25.4px;
+    text-align: center;
+    line-height: 22.4px;
 }
 
 table.data-table.result-table tbody tr td small {
-  font-family: "Noto Sans JP", sans-serif;
-  font-size: 0.7em;
-  font-weight: 500;
-  color: #767676;
-  margin-left: 4px;
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 0.7em;
+    font-weight: 500;
+    color: #767676;
+    margin-left: 4px;
 }
 
 table.data-table.result-table tbody tr td .race-no {
-  display: inline-block;
-  min-width: 29px;
+    display: inline-block;
+    min-width: 29px;
 }
 
 table.data-table.result-table thead tr th:nth-child(1),
 table.data-table.result-table tbody tr td.race-cell {
-  width: auto;
-  min-width: 81px;
-  max-width: 81px;
-  text-align: left;
+    width: auto;
+    min-width: 81px;
+    max-width: 81px;
+    text-align: left;
 }
 
 table.data-table.result-table tbody tr td.race-cell .race-name {
-  display: block;
-  font-family: "Noto Sans JP", sans-serif;
-  font-size: 0.7em;
-  font-weight: 500;
-  color: #767676;
-  word-break: break-word;
+    display: block;
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 0.7em;
+    font-weight: 500;
+    color: #767676;
+    word-break: break-word;
 }
 
 table.data-table.result-table thead tr th:nth-child(2),
 table.data-table.result-table tbody tr td.result-cell {
-  width: auto;
-  min-width: auto;
-  text-align: left;
+    width: auto;
+    min-width: auto;
+    text-align: left;
 }
 
 table.data-table.result-table thead tr th:nth-child(3),
 table.data-table.result-table tbody tr td.rank-cell {
-  width: auto;
-  min-width: 33px;
-  text-align: right;
+    width: auto;
+    min-width: 33px;
+    text-align: right;
 }
 
 /* 注目レース */
 .notable-race-head {
-  position: relative;
-  top: -5.5px;
-  margin-bottom: 11px;
+    position: relative;
+    top: -5.5px;
+    margin-bottom: 11px;
 }
 
 .notable-race-name {
-  display: block;
-  font-family: "Dela Gothic One", sans-serif;
-  font-size: 1.5em;
-  font-weight: 400;
-  line-height: 1.25;
-  transform: scale(0.82, 1.18);
-  transform-origin: left center;
-  transform-box: fill-box;
-  margin-top: 5.5px;
+    display: block;
+    font-family: "Dela Gothic One", sans-serif;
+    font-size: 1.5em;
+    font-weight: 400;
+    line-height: 1.25;
+    transform: scale(0.82, 1.18);
+    transform-origin: left center;
+    transform-box: fill-box;
+    margin-top: 5.5px;
 }
 
 .notable-meta {
-  display: block;
-  color: #767676;
-  font-size: 0.9em;
-  font-weight: 500;
-  margin-top: 4px;
+    display: block;
+    color: #767676;
+    font-size: 0.9em;
+    font-weight: 500;
+    margin-top: 4px;
 }
 
 table.data-table.notable-race-table tbody tr:first-child {
-  border-top: 3px solid #d0d0d0;
+    border-top: 3px solid #d0d0d0;
 }
 
 table.data-table.notable-race-table tbody tr td {
-  vertical-align: middle;
-  text-align: left;
+    vertical-align: middle;
+    text-align: left;
 }
 
 table.data-table.notable-race-table tbody tr td.horse-num-cell {
-  width: 36px;
-  min-width: 36px;
+    width: 36px;
+    min-width: 36px;
 }
 
 table.data-table.notable-race-table tbody tr td.horse-name-cell {
-  width: auto;
-  font-weight: 500;
-  min-width: 162px;
+    width: auto;
+    min-width: 126px;
+    font-weight: 500;
 }
 
 table.data-table.notable-race-table tbody tr td.horse-jockey-cell {
-  width: auto;
-  min-width: 48px;
-  color: #767676;
-  font-size: 0.95em;
+    width: auto;
+    min-width: 48px;
+    color: #767676;
+    font-size: 0.95em;
 }
 
 table.data-table.notable-race-table tbody tr td.horse-chips-cell {
-  width: auto;
-  text-align: right;
+    width: auto;
+    min-width: 77px;
+    text-align: right;
 }
 
 table.data-table.notable-race-table tbody tr td.horse-chips-cell .chips {
-  justify-content: flex-end;
+    justify-content: flex-end;
 }
