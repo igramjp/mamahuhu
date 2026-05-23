@@ -19,7 +19,8 @@
   to = "/result.html"
   status = 200
 
-# キャッシュ設定: JSONは短め、HTMLは中程度、静的アセットは長め
+# キャッシュ設定: JSONは300秒。HTML/CSS/JSはファイル名固定のため
+# 毎回サーバに確認(未変更は304で軽量、変更時は即反映)させる。
 [[headers]]
   for = "/data/*.json"
   [headers.values]
@@ -28,14 +29,14 @@
 [[headers]]
   for = "/*.html"
   [headers.values]
-    Cache-Control = "public, max-age=3600"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/*.css"
   [headers.values]
-    Cache-Control = "public, max-age=86400"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/*.js"
   [headers.values]
-    Cache-Control = "public, max-age=86400"
+    Cache-Control = "public, max-age=0, must-revalidate"
