@@ -163,7 +163,7 @@ function renderReport(data, surface, place, hotJockeysAllPlaces) {
   // バイアス
   html += `<section class="section">
     <h2 class="section-head">トラックバイアス</h2>
-    <p class="section-sub">直近の開催結果をもとに、枠順（内1-4 / 外5-8）と脚質ごとの成績を集計。</p>`;
+    <p class="section-sub">直近の開催結果をもとに、<br>枠順（内1-4 / 外5-8）と脚質ごとの成績を集計。</p>`;
   if (surfaceData) {
     html += renderSurface(surface, surfaceData, place, data.date);
   } else {
@@ -174,7 +174,7 @@ function renderReport(data, surface, place, hotJockeysAllPlaces) {
   // 騎手 (surface関係なく1日合算、その場の集計)
   html += `<section class="section">
     <h2 class="section-head">好調騎手</h2>
-    <p class="section-sub">人気差 = 人気 − 着順。複勝圏内で大駆けを決めた騎手。</p>
+    <p class="section-sub">人気差 = 人気 − 着順。<br>複勝圏内で大駆けを決めた騎手。</p>
     ${renderJockeys(data.hot_jockeys || [])}
   </section>`;
 

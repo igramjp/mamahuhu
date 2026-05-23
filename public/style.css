@@ -170,6 +170,12 @@ main {
     transform-box: fill-box;
 }
 
+@media (max-width: 420px) {
+    .link-button a span {
+        font-size: 2.5rem;
+    }
+}
+
 .link-button a:hover {
     background: #2f2f2f;
 }
