@@ -174,11 +174,25 @@ def get_race_ids_realtime(yyyymmdd, place):
     return sorted(ids)
 
 
+def _extract_grade(name_tag):
+    """RaceName内のグレードアイコン(Icon_GradeTypeN)から重賞グレードを判定。
+    netkeibaは G1=Type1 / G2=Type2 / G3=Type3。L/OP/未グレードや
+    地方重賞等(Type5,13...)は None を返す = 「G3以上のJRA重賞」のみ拾う。"""
+    if not name_tag:
+        return None
+    for span in name_tag.find_all("span"):
+        for cls in span.get("class", []):
+            m = re.fullmatch(r"Icon_GradeType(\d+)", cls)
+            if m and int(m.group(1)) in (1, 2, 3):
+                return f"G{int(m.group(1))}"
+    return None
+
+
 def fetch_main_race_entries(race_id):
     """11R(注目レース)の出馬表を shutuba_past.html から全頭抽出。
-    {race_name, surface, entries:[{枠,馬番,馬名,騎手,内外,脚質}]} を返す。
-    脚質は各馬の前走通過順から推定(直近5走の総合ラベルではない)。
-    取れない(出馬表未公開等)場合は None。"""
+    {race_name, grade, surface, entries:[{枠,馬番,馬名,騎手,内外,脚質}]} を返す。
+    grade は G1/G2/G3 か None。脚質は各馬の前走通過順から推定
+    (直近5走の総合ラベルではない)。取れない(出馬表未公開等)場合は None。"""
     url = f"https://race.netkeiba.com/race/shutuba_past.html?race_id={race_id}&rf=shutuba_submenu"
     r = requests.get(url, headers=HEADERS, timeout=20)
     r.encoding = "EUC-JP"
@@ -218,6 +232,7 @@ def fetch_main_race_entries(race_id):
 
     name_tag = soup.select_one(".RaceName")
     race_name = name_tag.get_text(strip=True) if name_tag else None
+    grade = _extract_grade(name_tag)
     info_tag = soup.select_one("div.RaceData01")
     info_text = info_tag.get_text(" ", strip=True) if info_tag else ""
     if "芝" in info_text:
@@ -228,7 +243,7 @@ def fetch_main_race_entries(race_id):
         surface = None
 
     entries.sort(key=lambda e: e["馬番"])
-    return {"race_name": race_name, "surface": surface, "entries": entries}
+    return {"race_name": race_name, "grade": grade, "surface": surface, "entries": entries}
 
 
 _NEXT_KAISAI_CACHE = {}

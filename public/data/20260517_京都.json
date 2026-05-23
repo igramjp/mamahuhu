@@ -2,7 +2,7 @@
   "place": "京都",
   "date": "20260517",
   "source": "realtime",
-  "generated_at": "2026-05-22T10:07:28",
+  "generated_at": "2026-05-23T12:07:43",
   "total_races": 12,
   "surfaces": {
     "芝": {
@@ -488,6 +488,7 @@
   ],
   "notable_race": {
     "race_name": "平安S",
+    "grade": "G3",
     "surface": "ダート",
     "entries": [
       {

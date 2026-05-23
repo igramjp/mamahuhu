@@ -7,15 +7,6 @@ async function fetchJSON(path) {
   return r.json();
 }
 
-function formatDateWithDow(yyyymmdd) {
-  const yyyy = +yyyymmdd.slice(0, 4);
-  const mm = +yyyymmdd.slice(4, 6);
-  const dd = +yyyymmdd.slice(6, 8);
-  const d = new Date(yyyy, mm - 1, dd);
-  const dow = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
-  return `${yyyy}/${String(mm).padStart(2, '0')}/${String(dd).padStart(2, '0')}(${dow})`;
-}
-
 function formatDateShort(yyyymmdd) {
   const yyyy = +yyyymmdd.slice(0, 4);
   const mm = +yyyymmdd.slice(4, 6);
@@ -30,7 +21,6 @@ const SURFACE_META = {
   "ダート": { cls: "dirt" },
 };
 const FRAME_PREFIX = { "内": "内枠の", "外": "外枠の" };
-const pct = v => (v * 100).toFixed(1) + "%";
 
 function placeAnchorId(place) {
   return `place-${encodeURIComponent(place)}`;
@@ -41,13 +31,13 @@ function renderSurfaceHeader(place, surface, c, prevDate) {
   const combo = (FRAME_PREFIX[c["内外"]] || c["内外"]) + c["脚質"];
   return `<div class="surface-header">
     <span class="surface-tag ${meta.cls}">${surface}</span>
-    <br><span class="best-combo">前開催日、${formatDateShort(prevDate)}のバイアス:<br><b>${combo}</b><small>※複勝率 ${pct(c["複勝率"])}（${c["出走数"]}頭）</small></span>
+    <br><span class="best-combo">最も好走した枠×脚質:<br><b>${combo}</b><small>※集計日 ${formatDateShort(prevDate)}</small></span>
   </div>`;
 }
 
 function renderHeadlines(place, surfaces, prevDate) {
   if (!surfaces || Object.keys(surfaces).length === 0) {
-    return '<p class="result-headline">前開催日データなし。</p>';
+    return '<p class="result-headline">直近の開催データなし。</p>';
   }
   let html = '';
   for (const surface of ['芝', 'ダート']) {
@@ -55,7 +45,6 @@ function renderHeadlines(place, surfaces, prevDate) {
     if (!c) continue;
     html += renderSurfaceHeader(place, surface, c, prevDate);
   }
-  html += '<p class="result-lead">を、当日の結果と照らし合わせてみると...</p>';
   return html;
 }
 
@@ -159,7 +148,8 @@ async function init() {
     target = kekkaItems[0];
   }
 
-  $('#date-display').textContent = formatDateWithDow(target.date);
+  const ledeDate = $('#lede-date');
+  if (ledeDate) ledeDate.textContent = formatDateShort(target.date);
 
   try {
     const data = await fetchJSON(`data/${target.filename}`);
