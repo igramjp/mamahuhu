@@ -272,6 +272,8 @@ section.lede {
 }
 
 .date-display span {
+    width: max-content;
+    height: auto;
     display: inline-block;
     font-family: "Dela Gothic One", sans-serif;
     font-size: 1.25em;
