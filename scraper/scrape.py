@@ -601,12 +601,27 @@ def per_race_top3(df):
 # ---------- 実行制御 ----------
 def is_opening_day(race_ids):
     """その開催の初日(=開催日コードが01)かどうか判定。
-    レースID 12桁の9-10桁目が開催日。
-    初日は過去走の馬場データが「別競馬場」のものになるためバイアス比較が無意味。"""
+    レースID 12桁の9-10桁目が開催日。"""
     if not race_ids:
         return False
     days = set(rid[8:10] for rid in race_ids)
     return days == {"01"}
+
+
+def raced_same_track_prev_week(place, yyyymmdd, lookback=8):
+    """前週(直近lookback日以内)に同一競馬場の開催JSONが存在するか。
+    回の初日(コード01)でも、前週が同じ競馬場なら(例: 2回東京→3回東京)
+    馬場が連続しておりバイアス比較は有効。逆に前走の馬場データが「別競馬場」
+    になるのは、前週まで別の場で開催していた新規場入りの初日のみ。"""
+    try:
+        d = datetime.strptime(yyyymmdd, "%Y%m%d").date()
+    except ValueError:
+        return False
+    for i in range(1, lookback + 1):
+        prev = (d - timedelta(days=i)).strftime("%Y%m%d")
+        if (DATA_DIR / f"{prev}_{place}.json").exists():
+            return True
+    return False
 
 
 def process_place(place, target_date=None):
@@ -629,8 +644,8 @@ def process_place(place, target_date=None):
             print(f"[{place}] 直近2週間に開催なし")
             return None
 
-    if is_opening_day(ids):
-        print(f"[{place}] {yyyymmdd}: 開催初日のためスキップ(競馬場異なるとバイアス比較無意味)")
+    if is_opening_day(ids) and not raced_same_track_prev_week(place, yyyymmdd):
+        print(f"[{place}] {yyyymmdd}: 新規場入りの開催初日のためスキップ(別競馬場とバイアス比較無意味)")
         return None
 
     print(f"[{place}] 開催日: {yyyymmdd} / {len(ids)}R")
