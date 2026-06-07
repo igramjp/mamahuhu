@@ -1,7 +1,22 @@
 {
-  "updated_at": "2026-06-06T23:57:18",
-  "count": 31,
+  "updated_at": "2026-06-07T10:01:02",
+  "count": 34,
   "items": [
+    {
+      "date": "20260607",
+      "place": "東京",
+      "filename": "20260607_東京.json"
+    },
+    {
+      "date": "20260607",
+      "place": "結果",
+      "filename": "20260607_結果.json"
+    },
+    {
+      "date": "20260607",
+      "place": "阪神",
+      "filename": "20260607_阪神.json"
+    },
     {
       "date": "20260606",
       "place": "東京",
