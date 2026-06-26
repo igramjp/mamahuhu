@@ -148,7 +148,8 @@ def get_race_ids_realtime(yyyymmdd, place):
     土日当日のスクレイプはこちら経由。"""
     url = f"https://race.sp.netkeiba.com/?pid=race_list&kaisai_date={yyyymmdd}"
     r = requests.get(url, headers=HEADERS, timeout=20)
-    r.encoding = "EUC-JP"
+    # race.sp.netkeiba.com は UTF-8 配信(db.netkeiba.com は引き続き EUC-JP)。
+    r.encoding = "utf-8"
     soup = BeautifulSoup(r.text, "html.parser")
 
     venue_code = COURSE[place]
@@ -195,7 +196,8 @@ def fetch_main_race_entries(race_id):
     (直近5走の総合ラベルではない)。取れない(出馬表未公開等)場合は None。"""
     url = f"https://race.netkeiba.com/race/shutuba_past.html?race_id={race_id}&rf=shutuba_submenu"
     r = requests.get(url, headers=HEADERS, timeout=20)
-    r.encoding = "EUC-JP"
+    # race.netkeiba.com は UTF-8 配信(db.netkeiba.com は引き続き EUC-JP)。
+    r.encoding = "utf-8"
     soup = BeautifulSoup(r.text, "html.parser")
     table = soup.select_one("table.Shutuba_Past5_Table")
     if not table:
@@ -313,7 +315,8 @@ def _fetch_zenso_styles(race_id):
     新馬戦・休養明け等で前走情報がない馬は脚質Noneになる。"""
     url = f"https://race.netkeiba.com/race/shutuba_past.html?race_id={race_id}&rf=shutuba_submenu"
     r = requests.get(url, headers=HEADERS, timeout=20)
-    r.encoding = "EUC-JP"
+    # race.netkeiba.com は UTF-8 配信(db.netkeiba.com は引き続き EUC-JP)。
+    r.encoding = "utf-8"
     soup = BeautifulSoup(r.text, "html.parser")
     table = soup.select_one("table.Shutuba_Past5_Table")
     if not table:
@@ -337,7 +340,8 @@ def get_result_realtime(race_id):
     コーナー通過順→通過)。"""
     url = f"https://race.netkeiba.com/race/result.html?race_id={race_id}"
     r = requests.get(url, headers=HEADERS, timeout=20)
-    r.encoding = "EUC-JP"
+    # race.netkeiba.com は UTF-8 配信(db.netkeiba.com は引き続き EUC-JP)。
+    r.encoding = "utf-8"
     soup = BeautifulSoup(r.text, "html.parser")
 
     table = soup.select_one("table.RaceTable01.ResultRefund")
