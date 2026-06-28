@@ -1,7 +1,27 @@
 {
-  "updated_at": "2026-06-27T09:40:38",
-  "count": 51,
+  "updated_at": "2026-06-28T10:00:33",
+  "count": 55,
   "items": [
+    {
+      "date": "20260628",
+      "place": "函館",
+      "filename": "20260628_函館.json"
+    },
+    {
+      "date": "20260628",
+      "place": "小倉",
+      "filename": "20260628_小倉.json"
+    },
+    {
+      "date": "20260628",
+      "place": "福島",
+      "filename": "20260628_福島.json"
+    },
+    {
+      "date": "20260628",
+      "place": "結果",
+      "filename": "20260628_結果.json"
+    },
     {
       "date": "20260627",
       "place": "函館",
