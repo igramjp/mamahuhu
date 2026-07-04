@@ -25,6 +25,7 @@ import requests
 from bs4 import BeautifulSoup
 
 import db
+import payouts as payouts_mod
 from scrape import COURSE, HEADERS, _extract_race_table
 
 CODE_TO_PLACE = {v: k for k, v in COURSE.items()}
@@ -213,6 +214,13 @@ def scrape_one(conn, race_id, yyyymmdd):
         html = fetch(f"https://db.netkeiba.com/race/{race_id}/")
         race, results = parse_race_page(html, race_id, yyyymmdd)
         db.upsert_race(conn, race, results)
+        # 同じHTMLから払戻も抽出(追加リクエストなし)。失敗しても本体は成功扱い
+        try:
+            pays = payouts_mod.parse_db_payouts(html)
+            if pays:
+                db.upsert_payouts(conn, race_id, pays)
+        except Exception as e:
+            print(f"  払戻パース失敗 {race_id}(継続): {str(e)[:80]}", flush=True)
         return True
     except Exception as e:
         db.record_failure(conn, race_id, yyyymmdd, e)
@@ -302,6 +310,56 @@ def run_backfill(date_from, date_to, db_path=None, limit=None):
     print_summary(conn, total_ok, total_fail, total_skip)
 
 
+def backfill_payouts(date_from, date_to, db_path=None, limit=None):
+    """取得済みレース(source='db')のうち払戻が未収集のものだけ、
+    レースページを再取得して払戻を埋める。通常のバックフィルと同じ
+    レート制限対策(SLEEP_RACE・連続エラー停止・定期休止)。"""
+    conn = db.connect(db_path)
+    rows = conn.execute(
+        "SELECT race_id, date FROM races"
+        " WHERE source = 'db' AND date BETWEEN ? AND ?"
+        "   AND race_id NOT IN (SELECT DISTINCT race_id FROM payouts)"
+        " ORDER BY date", (date_from, date_to)).fetchall()
+    if not rows:
+        print("払戻未収集のレースなし")
+        return
+    print(f"払戻バックフィル対象: {len(rows)}R", flush=True)
+
+    ok = fail = 0
+    consecutive_errors = 0
+    for i, (rid, ymd) in enumerate(rows):
+        if limit is not None and i >= limit:
+            print(f"--limit {limit} に到達、終了", flush=True)
+            break
+        try:
+            html = fetch(f"https://db.netkeiba.com/race/{rid}/")
+            pays = payouts_mod.parse_db_payouts(html)
+            if pays:
+                db.upsert_payouts(conn, rid, pays)
+                ok += 1
+            else:
+                fail += 1
+                print(f"  払戻なし {rid} ({ymd})", flush=True)
+            consecutive_errors = 0
+        except Exception as e:
+            fail += 1
+            consecutive_errors += 1
+            print(f"  FAIL {rid}: {str(e)[:120]}", flush=True)
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                print(f"!! 連続{consecutive_errors}回エラー。レート制限の疑いのため停止"
+                      f"(再実行で続きから)", flush=True)
+                break
+        time.sleep(SLEEP_RACE)
+        if (i + 1) % REST_EVERY == 0:
+            print(f"  ({i + 1}レース処理、{REST_SECONDS}秒休止)", flush=True)
+            time.sleep(REST_SECONDS)
+
+    n_pay = conn.execute(
+        "SELECT COUNT(DISTINCT race_id) FROM payouts").fetchone()[0]
+    print(f"\n払戻バックフィル完了: ok={ok} fail={fail}"
+          f" / DB累計 {n_pay}Rぶんの払戻", flush=True)
+
+
 def retry_failures(db_path=None):
     conn = db.connect(db_path)
     rows = list(conn.execute("SELECT race_id, date FROM failures ORDER BY date"))
@@ -338,10 +396,15 @@ def main():
     ap.add_argument("--db", dest="db_path", default=None)
     ap.add_argument("--limit", type=int, default=None, help="今回取得する最大レース数(テスト用)")
     ap.add_argument("--retry-failures", action="store_true")
+    ap.add_argument("--payouts-only", action="store_true",
+                    help="取得済みレースの払戻だけを埋める(過去分の払戻収集用)")
     args = ap.parse_args()
 
     if args.retry_failures:
         retry_failures(args.db_path)
+    elif args.payouts_only:
+        print(f"払戻バックフィル: {args.date_from} 〜 {args.date_to}", flush=True)
+        backfill_payouts(args.date_from, args.date_to, args.db_path, args.limit)
     else:
         print(f"バックフィル: {args.date_from} 〜 {args.date_to}", flush=True)
         run_backfill(args.date_from, args.date_to, args.db_path, args.limit)

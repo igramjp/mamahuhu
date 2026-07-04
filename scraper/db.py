@@ -95,6 +95,17 @@ CREATE TABLE IF NOT EXISTS forward_entries (
     PRIMARY KEY (race_id, umaban)
 );
 
+-- 払戻(全券種)。複雑券種の歪み研究(単勝確率→Harville式の三連系価格付けと
+-- 実払戻の突合)の材料。火曜のバックフィル(db.netkeibaページ)から取り込む。
+CREATE TABLE IF NOT EXISTS payouts (
+    race_id     TEXT NOT NULL,
+    bet_type    TEXT NOT NULL,   -- 単勝/複勝/枠連/馬連/ワイド/馬単/三連複/三連単
+    combination TEXT NOT NULL,   -- "14" / "5-14" / "14→5→1" (空白除去済み)
+    amount      INTEGER,         -- 100円あたり払戻金(円)
+    popularity  INTEGER,
+    PRIMARY KEY (race_id, bet_type, combination)
+);
+
 CREATE INDEX IF NOT EXISTS idx_races_date  ON races(date);
 CREATE INDEX IF NOT EXISTS idx_races_place ON races(place, date);
 CREATE INDEX IF NOT EXISTS idx_fwd_races_date ON forward_races(date);
@@ -157,6 +168,17 @@ FWD_RACE_COLS = ["race_id", "date", "place", "race_no", "race_name",
                  "surface", "distance", "course_setting", "snapped_at"]
 FWD_ENTRY_COLS = ["race_id", "umaban", "wakuban", "horse", "jockey",
                   "win_odds", "popularity", "snapped_at"]
+
+
+PAYOUT_COLS = ["race_id", "bet_type", "combination", "amount", "popularity"]
+
+
+def upsert_payouts(conn, race_id, rows):
+    """1レース分の払戻をUPSERT(再取得で置き換え)。"""
+    with conn:
+        conn.execute("DELETE FROM payouts WHERE race_id = ?", (race_id,))
+        for r in rows:
+            _upsert(conn, "payouts", PAYOUT_COLS, {**r, "race_id": race_id})
 
 
 def upsert_forward(conn, race, entries):
