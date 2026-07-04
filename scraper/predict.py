@@ -29,6 +29,9 @@ from bias import build_bias_report, latest_date_for_place, load_horses
 MODEL_VERSION = "v1(枠×バイアス・時系列学習済み)"
 BETA = 0.5            # backtest.py学習値(2024-01〜2025-06、条件付きロジットMLE)
 EV_THRESHOLD = 1.1    # 検証期間でEV≥1.1のベットは発生せず既定値を維持
+# 注目馬: モデルが市場より高く評価した馬(期待値基準の推奨とは別ティア)。
+# edge = model_prob/market_prob - 1 がこの値以上のレースで、最上位1頭に付す
+ATTENTION_FLOOR = 0.02
 
 
 def _prev_kaisai_date(conn, place, target_date):
@@ -89,6 +92,14 @@ def build_predictions(conn, place, target_date=None):
         #    1.1を超えるのは補正が市場と大きく食い違う馬だけで、それが正常。
         sub["ev"] = sub["model_prob"] * sub["odds"]
         sub["recommended"] = sub["ev"] >= EV_THRESHOLD
+        # 注目馬: 市場比の評価上乗せ(edge)が敷居以上のレースで、
+        # 最上位(edge同率ならモデル確率最大=有利グループ内の最上位人気)1頭
+        sub["edge"] = sub["model_prob"] / sub["market_prob"] - 1.0
+
+        attention_umaban = None
+        if float(sub["edge"].max()) >= ATTENTION_FLOOR:
+            top = sub[sub["edge"] >= sub["edge"].max() - 1e-9]
+            attention_umaban = int(top.loc[top["model_prob"].idxmax(), "umaban"])
 
         horses = [{
             "umaban": int(r.umaban),
@@ -98,7 +109,9 @@ def build_predictions(conn, place, target_date=None):
             "market_prob": round(float(r.market_prob), 4),
             "model_prob": round(float(r.model_prob), 4),
             "ev": round(float(r.ev), 3),
+            "edge": round(float(r.edge), 4),
             "recommended": bool(r.recommended),
+            "attention": int(r.umaban) == attention_umaban,
             "rank": int(r.finish) if pd.notna(r.finish) else None,
         } for r in sub.itertuples()]
         # 馬名・騎手を補完
@@ -111,9 +124,10 @@ def build_predictions(conn, place, target_date=None):
                 h["horse"], h["jockey"] = nm, jk or None
 
         n_reco = sum(1 for h in horses if h["recommended"])
-        horses.sort(key=lambda h: -h["ev"])
-        # site.dbのサイズ抑制: 表示に使う行(推奨馬 + EV上位3頭)だけ保存する
-        horses = [h for i, h in enumerate(horses) if h["recommended"] or i < 3]
+        horses.sort(key=lambda h: (-h["edge"], -h["model_prob"]))
+        # site.dbのサイズ抑制: 表示に使う行(推奨馬・注目馬 + 上位3頭)だけ保存
+        horses = [h for i, h in enumerate(horses)
+                  if h["recommended"] or h["attention"] or i < 3]
         races.append({
             "race_no": int(str(rid)[-2:]),
             "race_name": conn.execute(

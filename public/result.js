@@ -28,17 +28,21 @@ function outcomeChip(h) {
 }
 
 function horseRow(h) {
+  const kindChip = h.kind === "推奨"
+    ? '<span class="chip chip-hit">推奨</span>'
+    : `<span class="chip chip-attn">注目${h.edge != null ? ` +${(h.edge * 100).toFixed(1)}%` : ""}</span>`;
   return `<tr class="${h.hit ? "verify-hit-row" : ""}">
     <td class="horse-num-cell"><span class="horse-num">${h.umaban}</span></td>
     <td class="horse-name-cell">${h.horse || ""}</td>
     <td class="num-cell">${h.odds ?? "—"}</td>
-    <td class="num-cell">${h.ev != null ? h.ev.toFixed(2) : "—"}</td>
+    <td class="verify-kind-cell">${kindChip}</td>
     <td class="verify-outcome-cell">${outcomeChip(h)}</td>
   </tr>`;
 }
 
 function raceRow(r) {
   const meta = SURFACE_META[r.surface] || { cls: "" };
+  const hasAttn = r.horses.some((h) => h.kind === "注目");
   const head = `<div class="pred-race-head">
       <span class="race-no-tag">${r.race_no}R</span>
       <span class="pred-race-name">${r.race_name || ""}</span>
@@ -46,14 +50,15 @@ function raceRow(r) {
       ${r.verdict === "推奨"
         ? '<span class="verdict-chip verdict-reco">推奨</span>'
         : '<span class="verdict-chip verdict-pass">見送り</span>'}
+      ${hasAttn ? '<span class="verdict-chip verdict-attn">注目</span>' : ""}
     </div>`;
 
-  if (r.verdict !== "推奨") {
+  if (!r.horses.length) {
     return `<div class="pred-race verify-pass-race">${head}</div>`;
   }
 
   const table = `<table class="data-table pred-table"><thead><tr>
-      <th>馬番</th><th>馬名</th><th>単勝オッズ</th><th>期待値</th><th>結果</th>
+      <th>馬番</th><th>馬名</th><th>単勝オッズ</th><th>区分</th><th>結果</th>
     </tr></thead><tbody>${r.horses.map(horseRow).join("")}</tbody></table>`;
   return `<div class="pred-race pred-race-open">${head}${table}</div>`;
 }
@@ -61,9 +66,9 @@ function raceRow(r) {
 function summaryHtml(s, label) {
   return `<div class="verify-summary">
     <div class="verify-stat"><span class="verify-stat-num">${s.n_races}</span><span class="verify-stat-label">対象R</span></div>
-    <div class="verify-stat"><span class="verify-stat-num">${s.n_reco_races}</span><span class="verify-stat-label">推奨R</span></div>
-    <div class="verify-stat"><span class="verify-stat-num">${s.n_hit}<small>/${s.n_reco}</small></span><span class="verify-stat-label">的中/推奨頭数</span></div>
-    <div class="verify-stat"><span class="verify-stat-num ${s.roi != null && s.roi >= 100 ? "roi-plus" : ""}">${fmtRoi(s.roi)}</span><span class="verify-stat-label">単勝回収率</span></div>
+    <div class="verify-stat"><span class="verify-stat-num">${s.n_reco}<small>頭</small></span><span class="verify-stat-label">推奨(EV1.1超)</span></div>
+    <div class="verify-stat"><span class="verify-stat-num">${s.n_attn_hit}<small>/${s.n_attn}</small></span><span class="verify-stat-label">注目馬 的中</span></div>
+    <div class="verify-stat"><span class="verify-stat-num ${s.attn_roi != null && s.attn_roi >= 100 ? "roi-plus" : ""}">${fmtRoi(s.attn_roi)}</span><span class="verify-stat-label">注目馬 回収率</span></div>
   </div>`;
 }
 

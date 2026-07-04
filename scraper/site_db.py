@@ -97,7 +97,9 @@ CREATE TABLE IF NOT EXISTS pred_horses (
     market_prob REAL,            -- オッズ由来の市場確率(レース内正規化)
     model_prob  REAL,            -- モデル確率
     ev          REAL,            -- 期待値 = model_prob × odds
+    edge        REAL,            -- 市場比の評価上乗せ = model/market - 1
     recommended INTEGER NOT NULL DEFAULT 0,
+    attention   INTEGER NOT NULL DEFAULT 0,  -- 注目馬(市場比+2%以上の最上位)
     rank        INTEGER,         -- 確定着順(結果判明後。未確定はNULL)
     PRIMARY KEY (date, place, race_no, umaban)
 );
@@ -116,9 +118,10 @@ def connect(db_path=None):
     return conn
 
 
-# write_report が総入れ替えする対象。bias3_*/pred_* は
-# それぞれの writer (write_bias3 / write_predictions) が独自に入れ替える。
-REPORT_TABLES = ["reports", "notable_races", "notable_entries"]
+# write_report が総入れ替えする対象。notable_* は write_notable が、
+# bias3_*/pred_* は各writerが独自に入れ替える(rebuildでnotableを消さないため
+# ここには含めない)。
+REPORT_TABLES = ["reports"]
 
 
 def _delete_report(conn, date, place):
@@ -231,11 +234,12 @@ def write_predictions(conn, date, place, races):
                  r.get("distance"), r["verdict"], r.get("model_version")))
             for h in r.get("horses") or []:
                 conn.execute(
-                    "INSERT INTO pred_horses VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO pred_horses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (date, place, r["race_no"], h["umaban"], h.get("horse"),
                      h.get("jockey"), h.get("odds"), h.get("market_prob"),
-                     h.get("model_prob"), h.get("ev"),
-                     1 if h.get("recommended") else 0, h.get("rank")))
+                     h.get("model_prob"), h.get("ev"), h.get("edge"),
+                     1 if h.get("recommended") else 0,
+                     1 if h.get("attention") else 0, h.get("rank")))
 
 
 if __name__ == "__main__":

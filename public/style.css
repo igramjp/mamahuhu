@@ -1320,3 +1320,23 @@ table.data-table.pred-table thead tr th {
 table.data-table.pred-table thead tr th:not(:first-child):not(:nth-child(2)) {
     text-align: right;
 }
+
+
+/* ===== 注目馬ティア(市場比+2%以上の相対シグナル) ===== */
+.chip.chip-attn {
+    background: #fdeeca;
+    color: #7a5200;
+}
+
+.verdict-chip.verdict-attn {
+    background: #fdeeca;
+    color: #7a5200;
+}
+
+.attn-row {
+    background: #fdf8ec;
+}
+
+.verify-kind-cell {
+    text-align: right;
+}

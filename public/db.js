@@ -149,14 +149,16 @@
 
   function verify(targetDate) {
     const places = [];
-    const total = { n_races: 0, n_reco_races: 0, n_reco: 0, n_hit: 0, payout: 0 };
+    const total = { n_races: 0, n_reco_races: 0, n_reco: 0, n_hit: 0, payout: 0,
+                    n_attn: 0, n_attn_hit: 0, attn_payout: 0 };
 
     for (const p of rows(
       `SELECT DISTINCT place FROM pred_races WHERE date = ? ORDER BY place`,
       [targetDate],
     )) {
       const place = p.place;
-      const sum = { n_races: 0, n_reco_races: 0, n_reco: 0, n_hit: 0, payout: 0 };
+      const sum = { n_races: 0, n_reco_races: 0, n_reco: 0, n_hit: 0, payout: 0,
+                    n_attn: 0, n_attn_hit: 0, attn_payout: 0 };
       const races = [];
       for (const r of rows(
         `SELECT * FROM pred_races WHERE date = ? AND place = ? ORDER BY race_no`,
@@ -183,9 +185,27 @@
             }
             race.horses.push({
               umaban: h.umaban, horse: h.horse, odds: h.odds,
-              ev: h.ev, rank: h.rank, hit,
+              ev: h.ev, edge: h.edge, rank: h.rank, hit, kind: "推奨",
             });
           }
+        }
+        // 注目馬(推奨とは別ティア): 見送りレースにも付きうる
+        for (const h of rows(
+          `SELECT * FROM pred_horses
+           WHERE date = ? AND place = ? AND race_no = ?
+             AND attention = 1 AND recommended = 0`,
+          [targetDate, place, r.race_no],
+        )) {
+          const hit = h.rank === 1;
+          sum.n_attn++;
+          if (hit) {
+            sum.n_attn_hit++;
+            sum.attn_payout += h.odds || 0;
+          }
+          race.horses.push({
+            umaban: h.umaban, horse: h.horse, odds: h.odds,
+            ev: h.ev, edge: h.edge, rank: h.rank, hit, kind: "注目",
+          });
         }
         races.push(race);
       }
@@ -194,12 +214,14 @@
     }
 
     if (!places.length) return null;
-    // 単勝回収率(%): 100円均等買い想定 = Σ(的中オッズ)/推奨頭数 × 100
-    total.roi = total.n_reco ? (total.payout / total.n_reco) * 100 : null;
-    for (const pl of places) {
-      pl.summary.roi = pl.summary.n_reco
-        ? (pl.summary.payout / pl.summary.n_reco) * 100 : null;
-    }
+    // 単勝回収率(%): 100円均等買い想定 = Σ(的中オッズ)/頭数 × 100
+    const withRoi = (s) => {
+      s.roi = s.n_reco ? (s.payout / s.n_reco) * 100 : null;
+      s.attn_roi = s.n_attn ? (s.attn_payout / s.n_attn) * 100 : null;
+      return s;
+    };
+    withRoi(total);
+    for (const pl of places) withRoi(pl.summary);
     return { date: targetDate, places, total };
   }
 
@@ -217,7 +239,8 @@
     for (const r of races) {
       r.horses = rows(
         `SELECT * FROM pred_horses WHERE date = ? AND place = ? AND race_no = ?
-         ORDER BY ev DESC, umaban`, [date, place, r.race_no]);
+         ORDER BY attention DESC, recommended DESC, edge DESC, model_prob DESC,
+                  umaban`, [date, place, r.race_no]);
     }
     return races;
   }

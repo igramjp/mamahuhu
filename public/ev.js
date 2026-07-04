@@ -18,16 +18,19 @@ function formatDateWithDow(yyyymmdd) {
 }
 
 function horseRows(horses, expanded) {
-  // 推奨レース: 推奨馬全頭 + 参考上位。見送りレース: 折りたたみで上位3頭。
+  // 展開時: 推奨・注目+上位3頭。折りたたみ: 上位3頭。
   const shown = expanded
-    ? horses.filter((h) => h.recommended || horses.indexOf(h) < 3)
+    ? horses.filter((h) => h.recommended || h.attention || horses.indexOf(h) < 3)
     : horses.slice(0, 3);
   let rows = "";
   for (const h of shown) {
     const evCls = h.ev >= 1.1 ? "ev-hot" : h.ev >= 0.9 ? "ev-warm" : "";
-    rows += `<tr class="${h.recommended ? "reco-row" : ""}">
+    const chips =
+      (h.recommended ? '<span class="chip chip-hit reco-chip">推奨</span>' : "") +
+      (h.attention ? `<span class="chip chip-attn reco-chip">注目 市場比+${(h.edge * 100).toFixed(1)}%</span>` : "");
+    rows += `<tr class="${h.recommended ? "reco-row" : h.attention ? "attn-row" : ""}">
       <td class="horse-num-cell"><span class="horse-num">${h.umaban}</span></td>
-      <td class="horse-name-cell">${h.horse || ""}${h.recommended ? '<span class="chip chip-hit reco-chip">推奨</span>' : ""}</td>
+      <td class="horse-name-cell">${h.horse || ""}${chips}</td>
       <td class="num-cell">${h.odds ?? "-"}</td>
       <td class="num-cell">${pctP(h.market_prob)}</td>
       <td class="num-cell">${pctP(h.model_prob)}</td>
@@ -40,22 +43,26 @@ function horseRows(horses, expanded) {
 function raceCard(r) {
   const meta = SURFACE_META[r.surface] || { cls: "" };
   const isReco = r.verdict === "推奨";
+  const hasAttn = r.horses.some((h) => h.attention);
   const verdictChip = isReco
     ? '<span class="verdict-chip verdict-reco">推奨あり</span>'
     : '<span class="verdict-chip verdict-pass">見送り</span>';
+  const attnChip = hasAttn
+    ? '<span class="verdict-chip verdict-attn">注目</span>' : "";
 
   const head = `<div class="pred-race-head">
       <span class="race-no-tag">${r.race_no}R</span>
       <span class="pred-race-name">${r.race_name || ""}</span>
       <span class="surface-tag-mini ${meta.cls}">${r.surface}${r.distance || ""}m</span>
-      ${verdictChip}
+      ${verdictChip}${attnChip}
     </div>`;
 
+  const expanded = isReco || hasAttn;
   const table = `<table class="data-table pred-table"><thead><tr>
       <th>馬番</th><th>馬名</th><th>単勝オッズ</th><th>市場確率</th><th>モデル確率</th><th>期待値</th>
-    </tr></thead><tbody>${horseRows(r.horses, isReco)}</tbody></table>`;
+    </tr></thead><tbody>${horseRows(r.horses, expanded)}</tbody></table>`;
 
-  if (isReco) {
+  if (expanded) {
     return `<div class="pred-race pred-race-open">${head}${table}</div>`;
   }
   return `<details class="pred-race"><summary>${head}</summary>${table}</details>`;
@@ -63,9 +70,10 @@ function raceCard(r) {
 
 function placeSectionHtml(place, races) {
   const nReco = races.filter((r) => r.verdict === "推奨").length;
+  const nAttn = races.filter((r) => r.horses.some((h) => h.attention)).length;
   return `<section class="section panel">
     <h2 class="section-head">${place}</h2>
-    <p class="pred-summary">${races.length}レース中 <b>${nReco}</b>レースに推奨あり、<b>${races.length - nReco}</b>レースは見送り。</p>
+    <p class="pred-summary">${races.length}レース中 推奨<b>${nReco}</b>R・注目<b>${nAttn}</b>R・見送り<b>${races.length - nReco}</b>R。</p>
     ${races.map(raceCard).join("")}
   </section>`;
 }
@@ -82,7 +90,8 @@ function renderAll(date, items) {
   html += `<section class="section">
     <h2 class="section-head">定義</h2>
     <p class="yomi-foot">市場確率 = 単勝オッズの逆数をレース内で正規化した勝率推定。モデル確率 = 市場確率の対数オッズに、当該馬の相対枠位置グループのバイアス乖離Δを加点して再正規化した値。期待値 = モデル確率 × 単勝オッズ。市場と同一の確率なら期待値は控除率相当(約0.8)に収束するため、閾値1.1超は市場との明確な見解差を意味する。
-    現行モデル(v1)のバックテストでは、枠順バイアス由来の歪みはオッズに織り込み済みで有意な優位性は検出されなかった。したがって推奨は稀で、見送りが標準的な結論となる。特徴量の拡張(脚質・柵設定等)は検証を通過したものだけを順次追加する。</p>
+    現行モデル(v1)のバックテストでは、枠順バイアス由来の歪みはオッズに織り込み済みで有意な優位性は検出されなかった。したがって「推奨」(期待値1.1超)は稀で、見送りが標準的な結論となる。特徴量の拡張は検証を通過したものだけを順次追加する。</p>
+    <p class="yomi-foot">「注目」= モデルが市場より+2%以上高く評価したレースの最上位馬。バイアスの追い風が明確な馬を示す相対的なシグナルであり、<b>期待値がプラスであることを意味しない</b>(控除率の壁は超えていない)。注目馬の成績は結果検証ページで継続的に開示する。</p>
     ${version ? `<p class="model-badge">model: ${version}</p>` : ""}
     <p class="yomi-note">⚠️ 本分析は統計的情報の提供であり、的中・収益を保証しません。馬券の購入は20歳以上・自己責任で。</p>
   </section>`;
