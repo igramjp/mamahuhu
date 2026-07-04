@@ -13,8 +13,9 @@ mamahuhu X auto-poster
 
 データは同一リポジトリ内の public/data/site.db / data/keiba.db から読む。
 モデルパラメータ(β・EV閾値)は scraper/predict.py を単一の真実として参照。
+サイトURLはプロフィール欄に置くため、リプライ(ツリー)でのURL投稿は行わない。
 
-cost: メイン($0.015) + リプライ($0.01) = 約$0.025/投稿
+cost: 約$0.015/投稿
 """
 
 from __future__ import annotations
@@ -43,13 +44,11 @@ JST = timezone(timedelta(hours=9))
 NETKEIBA_BASE = "https://race.netkeiba.com"
 SITE_DB_PATH = Path(__file__).resolve().parent.parent / "public" / "data" / "site.db"
 USER_AGENT = "mamahuhu-bot/1.0 (+https://mamahuhu.app/)"
-MAMAHUHU_URL = "https://mamahuhu.app/"
 REQUEST_TIMEOUT = 30
 SLEEP_BETWEEN_SCRAPE = 2   # netkeibaへの負荷軽減
 SLEEP_BETWEEN_POST = 5     # X側のレート制限対策
 TWEET_LIMIT = 280          # X weighted length 上限
 KEIBA_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "keiba.db"
-RESULT_URL = "https://mamahuhu.app/result"
 # JRA単勝のオーバーラウンド(Σ1/オッズ)の下限目安。期待値上界の計算に使う
 OVERROUND_FLOOR = 1.15
 
@@ -303,7 +302,7 @@ def compose_pass_tweet(race_name: str, memo: str) -> str:
         "",
         memo,
         "",
-        "全レースの分析はリプライから",
+        "全レースの分析はプロフィールのリンクから",
     ]
     body = "\n".join(lines)
     if tweet_weight(body) > TWEET_LIMIT:
@@ -328,7 +327,7 @@ def compose_verify_tweet(dates: list[str], n_races: int, n_reco: int,
         f"参考: 全馬に単勝100円を投じた場合の回収率は{round(bench_roi)}%",
         "",
         "「買わない」も検証可能な判断として記録しています。",
-        "詳細はリプライから",
+        "検証記録はプロフィールのリンクから",
     ]
     return "\n".join(lines)
 
@@ -348,21 +347,19 @@ def write_step_summary(lines: list[str]) -> None:
         log.warning("step summary 書き込み失敗: %s", e)
 
 
-def post_thread(text: str, reply_url: str) -> str:
+def post_tweet(text: str) -> str:
+    """単発ツイートを投稿する。サイトURLはプロフィール欄にあるため
+    リプライ(ツリー)は付けない。"""
     client = tweepy.Client(
         consumer_key=os.environ["X_API_KEY"],
         consumer_secret=os.environ["X_API_SECRET"],
         access_token=os.environ["X_ACCESS_TOKEN"],
         access_token_secret=os.environ["X_ACCESS_SECRET"],
     )
-    main = client.create_tweet(text=text)
-    main_id = main.data["id"]
-    log.info("posted main tweet id=%s", main_id)
-
-    time.sleep(2)
-    reply = client.create_tweet(text=reply_url, in_reply_to_tweet_id=main_id)
-    log.info("posted reply id=%s", reply.data["id"])
-    return main_id
+    resp = client.create_tweet(text=text)
+    tweet_id = resp.data["id"]
+    log.info("posted tweet id=%s", tweet_id)
+    return tweet_id
 
 
 # ---------- 結果検証ポスト(火曜) ----------
@@ -405,7 +402,7 @@ def run_verify(now_dt: datetime, dry_run: bool) -> int:
     log.info("検証投稿本文(重み%d):\n%s", tweet_weight(text), text)
 
     if not dry_run:
-        post_thread(text, RESULT_URL)
+        post_tweet(text)
 
     write_step_summary([
         "### 結果検証ポスト",
@@ -562,7 +559,7 @@ def main() -> int:
             log.info("投稿本文(重み%d):\n%s", tweet_weight(text), text)
 
             if not dry_run:
-                post_thread(text, MAMAHUHU_URL)
+                post_tweet(text)
                 time.sleep(SLEEP_BETWEEN_POST)
             posted += 1
             outcomes.append(
