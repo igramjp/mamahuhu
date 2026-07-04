@@ -11,3 +11,7 @@ node_modules/
 *.db-wal
 *.db-shm
 *.db-journal
+
+# Claude Code ローカル設定(仕様書だけコミットする)
+.claude/*
+!.claude/bias_analysis_spec.md
