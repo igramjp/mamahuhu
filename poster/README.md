@@ -1,7 +1,7 @@
 # mamahuhu X auto-poster
 
 毎週金・土の20時(JST)に、翌日のG3以上のメインレースを netkeiba から取得し、
-mamahuhu の直近開催結果データ (バイアス + 好調騎手) を組み合わせて X に投稿する bot。
+mamahuhu の直近開催バイアスデータを組み合わせて X に投稿する bot。
 
 (バイアスデータ site.db は土日18時に生成・コミットされるため、その後の20時に走らせる)
 
@@ -54,7 +54,6 @@ GitHub の Actions タブ → `post-to-x` → Run workflow → `dry_run = true` 
    - データが無い開催場はスキップ。フォールバックなし
 4. 各レースの出馬表から騎手と芝/ダートを取得
 5. その芝/ダートの `best_combo` (内外+脚質) からバイアス文字列を生成
-6. site.db の `hot_jockeys` 全員と照合し、出走中の好調騎手をピックアップ
 7. テンプレに沿って投稿 → リプライで mamahuhu URL
 
 ## コスト試算

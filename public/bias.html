@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>バイアス分析 | 馬馬虎虎</title>
+        <meta
+            name="description"
+            content="JRA全開催のトラックバイアスを統計的に推定。枠順・脚質の成績を過去2〜3年のベースラインからの乖離として定量化し、距離帯別・有意性付きで公開。"
+        />
+        <link rel="canonical" href="https://mamahuhu.app/bias" />
+
+        <meta property="og:title" content="バイアス分析 | 馬馬虎虎" />
+        <meta
+            property="og:description"
+            content="JRA全開催のトラックバイアスを統計的に推定。枠順・脚質の成績を過去2〜3年のベースラインからの乖離として定量化し、距離帯別・有意性付きで公開。"
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://mamahuhu.app/bias" />
+        <meta
+            property="og:image"
+            content="https://mamahuhu.app/images/thumbnail.jpg"
+        />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="馬馬虎虎(マーマーフーフー)" />
+        <meta property="og:site_name" content="馬馬虎虎" />
+        <meta property="og:locale" content="ja_JP" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="バイアス分析 | 馬馬虎虎" />
+        <meta
+            name="twitter:description"
+            content="JRA全開催のトラックバイアスを統計的に推定。枠順・脚質の成績を過去2〜3年のベースラインからの乖離として定量化し、距離帯別・有意性付きで公開。"
+        />
+        <meta
+            name="twitter:image"
+            content="https://mamahuhu.app/images/thumbnail.jpg"
+        />
+
+        <link rel="icon" href="/images/favicon.ico" sizes="any" />
+
+        <!-- Google tag (gtag.js) -->
+        <script
+            async
+            src="https://www.googletagmanager.com/gtag/js?id=G-SR10XVDP3Z"
+        ></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+                dataLayer.push(arguments);
+            }
+            gtag("js", new Date());
+            gtag("config", "G-SR10XVDP3Z");
+        </script>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="style.css" />
+
+        <!-- Google AdSense: 承認後にコメントを外し、ca-pub-XXXX を自分のIDに置換 -->
+        <!--
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
+-->
+    </head>
+
+    <body>
+        <header class="masthead">
+            <div class="masthead-inner">
+                <div class="brand">
+                    <h1 class="brand-name">
+                        <a href="index.html">
+                            <img
+                                class="logo"
+                                src="/images/logo.webp"
+                                alt="馬馬虎虎(マーマ
+          ーフーフー)"
+                            />
+                        </a>
+                    </h1>
+                </div>
+            </div>
+        </header>
+
+        <main class="container">
+            <section class="lede lede-compact">
+                <p class="lede-text">
+                    直近開催の枠順・脚質バイアスを、過去2〜3年のベースラインからの乖離として定量化。
+                </p>
+                <p class="lede-meaning">
+                    期待値分析のモデル確率は、ここで推定した乖離Δを補正項として使っています。
+                </p>
+                <div class="date-display">
+                    <span class="date-value" id="date-display">--</span>
+                </div>
+            </section>
+
+            <div id="report" class="report">
+                <p class="loading">よみこみちゅう...</p>
+            </div>
+
+            <!-- AdSense広告枠: 承認後にコメントを外し、自分のIDに置換 -->
+            <!--
+  <div class="ad-slot">
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+         data-ad-slot="XXXXXXXXXX"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+  -->
+
+            <div class="link-button">
+                <a href="index.html"><span>期待値分析を見る</span></a>
+            </div>
+
+            <div id="result-cta" class="link-button" hidden>
+                <a href="result.html"><span>結果検証を見る</span></a>
+            </div>
+        </main>
+
+        <footer class="site-footer">
+            <nav class="nav-links">
+                <a href="index.html">期待値分析</a>
+                <a href="bias.html">バイアス分析</a>
+                <a href="result.html">結果検証</a>
+                <a href="about.html">分析手法</a>
+                <a href="privacy.html">プライバシー</a>
+            </nav>
+            <p class="copyright">&copy; 2026 馬馬虎虎</p>
+        </footer>
+
+        <script src="nav.js"></script>
+        <script src="vendor/sqljs/sql-wasm.js"></script>
+        <script src="db.js"></script>
+        <script src="bias.js"></script>
+    </body>
+</html>

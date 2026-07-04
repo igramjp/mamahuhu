@@ -1,12 +1,12 @@
 """
 mamahuhu X auto-poster
 
-毎週土日の朝、その日のG3以上のメインレースを netkeiba から取得し、
-直近開催結果データ (バイアス + 好調騎手) を組み合わせて X に投稿する。
+毎週金・土の20時、翌日のG3以上のメインレースを netkeiba から取得し、
+直近開催のバイアスデータを組み合わせて X に投稿する。
 バイアスデータは同一リポジトリ内の public/data/site.db (SQLite) から読む
 (旧: mamahuhu.app の JSON を HTTP 取得)。
 
-メインツイート: バイアス + 該当する好調騎手
+メインツイート: バイアス + 該当馬
 リプライ: mamahuhu の URL
 
 cost: メイン($0.015) + リプライ($0.01) = 約$0.025/レース
@@ -77,68 +77,59 @@ def _site_db() -> sqlite3.Connection:
     return _site_db_conn
 
 
+# 「来てる」判定(サイト側 db.js の favoredGroup と同じ定義)
+DEV_THRESHOLD = 0.01
+MIN_N = 8
+
+
 def fetch_race_data_on(course: str, date_dt: datetime) -> dict | None:
-    """指定日の開催データを site.db から読み、旧JSONと同形のdictで返す。
-    (使うのは surfaces.*.best_combo と hot_jockeys のみ)。データなしはNone。"""
+    """指定日の馬場よみ(bias3)を site.db から読み、コース種別ごとの
+    「来てる」グループを返す: {surface: {"frame": 内/中/外|None, "style": ...|None}}。
+    データなしはNone。"""
     date_str = date_dt.strftime("%Y%m%d")
     conn = _site_db()
-    rep = conn.execute(
-        "SELECT 1 FROM reports WHERE date = ? AND place = ?",
-        (date_str, course)).fetchone()
-    if rep is None:
-        log.info("%s: %s のデータなし", course, date_str)
-        return None
 
     surfaces: dict = {}
-    for surface, frame, style, rate, n in conn.execute(
-        "SELECT surface, best_combo_frame, best_combo_style,"
-        " best_combo_rate, best_combo_n"
-        " FROM surface_stats WHERE date = ? AND place = ?",
-        (date_str, course)):
-        best_combo = None
-        if frame:
-            best_combo = {"内外": frame, "脚質": style,
-                          "複勝率": rate, "出走数": n}
-        surfaces[surface] = {"best_combo": best_combo}
+    for surface, kind, grp, deviation, n in conn.execute(
+        "SELECT surface, kind, grp, deviation, n FROM bias3_stats"
+        " WHERE date = ? AND place = ?", (date_str, course)):
+        key = "frame" if kind == "frame3" else "style"
+        s = surfaces.setdefault(surface, {"frame": None, "style": None,
+                                          "_best": {}})
+        if (n or 0) < MIN_N or deviation is None or deviation > -DEV_THRESHOLD:
+            continue
+        best = s["_best"].get(key)
+        if best is None or deviation < best:
+            s["_best"][key] = deviation
+            s[key] = grp
 
-    hot_jockeys = [
-        {"騎手": j} for (j,) in conn.execute(
-            "SELECT jockey FROM hot_jockeys WHERE date = ? AND place = ?"
-            " ORDER BY max_pop_diff DESC, jockey", (date_str, course))
-    ]
-
-    log.info("%s: 開催データ取得 (%s)", course, date_str)
-    return {"surfaces": surfaces, "hot_jockeys": hot_jockeys}
-
-
-def get_best_combo(data: dict, surface: str) -> dict:
-    return data.get("surfaces", {}).get(surface, {}).get("best_combo") or {}
-
-
-def derive_bias(data: dict, surface: str) -> str | None:
-    """対象レースの芝/ダートに応じて best_combo を「{内外}枠の{脚質}」に整形。"""
-    combo = get_best_combo(data, surface)
-    io = combo.get("内外")
-    style = combo.get("脚質")
-    if not io or not style:
+    if not surfaces:
+        log.info("%s: %s の馬場よみデータなし", course, date_str)
         return None
-    return f"{io}枠の{style}"
+    for s in surfaces.values():
+        s.pop("_best", None)
+    log.info("%s: 馬場よみ取得 (%s) %s", course, date_str, surfaces)
+    return surfaces
 
 
-def io_from_waku(waku: int) -> str:
-    """枠番(1-8)を内外に2分。枠1-4=内、枠5-8=外。"""
-    return "内" if waku <= 4 else "外"
+def derive_bias(verdicts: dict, surface: str) -> str | None:
+    """コース種別の「来てる」グループを投稿文用に整形。どちらも無ければNone。"""
+    v = (verdicts or {}).get(surface)
+    if not v:
+        return None
+    parts = []
+    if v.get("frame"):
+        parts.append(f"{v['frame']}枠")
+    if v.get("style"):
+        parts.append(v["style"])
+    if not parts:
+        return None
+    return "いつもより" + "・".join(parts) + "が来てる"
 
 
 def style_from_last_corner(last_corner: int, field_size: int) -> str:
     """前走の4コーナー通過順位を脚質2分類に。頭数の前半なら逃げ先行。"""
     return "逃げ先行" if last_corner <= field_size / 2 else "差し追込"
-
-
-def get_hot_jockeys(data: dict) -> list[str]:
-    return [
-        j["騎手"] for j in data.get("hot_jockeys", []) if j.get("騎手")
-    ]
 
 
 # ---------- netkeiba スクレイピング ----------
@@ -296,18 +287,21 @@ def fetch_last_run_styles(race_id: str) -> dict[str, str]:
 def match_bias_horses(
     entries: list[dict],
     last_styles: dict[str, str],
-    bias_io: str | None,
+    bias_frame: str | None,
     bias_style: str | None,
 ) -> list[str]:
-    """枠の内外と前走脚質が両方バイアスに一致する馬名を返す。"""
-    if not bias_io or not bias_style:
+    """相対枠位置(内/中/外)と前走脚質が両方「来てる」側に一致する馬名を返す。
+    相対枠位置は出馬表の並び(=馬番順)で3等分する(集計側と同じ定義)。"""
+    if not bias_frame or not bias_style:
+        return []
+    n = len(entries)
+    if n == 0:
         return []
     matched: list[str] = []
-    for e in entries:
-        waku = e.get("waku")
-        if waku is None:
-            continue
-        if io_from_waku(waku) != bias_io:
+    for i, e in enumerate(entries):
+        p = (i + 1) / n
+        frame3 = "内" if p <= 1 / 3 + 1e-9 else ("中" if p <= 2 / 3 + 1e-9 else "外")
+        if frame3 != bias_frame:
             continue
         if last_styles.get(e["horse"]) != bias_style:
             continue
@@ -315,21 +309,7 @@ def match_bias_horses(
     return matched
 
 
-# ---------- マッチング & 投稿 ----------
-def match_hot_jockeys(
-    race_jockeys: list[str], hot_jockeys: list[str]
-) -> list[str]:
-    """出走騎手の中から好調騎手リストに該当するものを返す(部分一致)。"""
-    matched: list[str] = []
-    for hot in hot_jockeys:
-        for j in race_jockeys:
-            if hot in j or j in hot:
-                if j not in matched:
-                    matched.append(j)
-                break
-    return matched
-
-
+# ---------- 投稿 ----------
 def race_name_to_hashtag(race_name: str) -> str:
     cleaned = re.sub(r"[((].*?[))]", "", race_name)
     # 長音記号 ー は #オークス 等で有効な文字なので残す。
@@ -347,10 +327,8 @@ def compose_tweet(
     race_name: str,
     course: str,
     bias: str,
-    matched_jockeys: list[str],
     matched_horses: list[str],
 ) -> str:
-    # 好調騎手(matched_jockeys)は当面非表示。算出は main 側で継続。
     hashtag = race_name_to_hashtag(race_name)
     head = [f"#{hashtag} のバイアスは...", f"「{bias}」"]
     tail = ["", "詳しい集計データはツリーから"]
@@ -493,16 +471,6 @@ def main() -> int:
         if d is not None:
             data_cache[course] = d
 
-    # 好調騎手は全開催場のデータをユニオン (前日から移動してくる騎手対策)
-    all_hot_jockeys: list[str] = []
-    seen: set[str] = set()
-    for d in data_cache.values():
-        for j in get_hot_jockeys(d):
-            if j not in seen:
-                seen.add(j)
-                all_hot_jockeys.append(j)
-    log.info("全場ユニオンの好調騎手: %s", all_hot_jockeys)
-
     # 3. 各レース処理
     posted = 0
     outcomes: list[tuple[str, str, str, str]] = []  # (場, grade, レース名, 結果)
@@ -548,30 +516,27 @@ def main() -> int:
             bias = derive_bias(data, surface)
             if not bias:
                 log.info(
-                    "%s: %s のバイアス導出不可、スキップ",
+                    "%s: %s はいつも通りの馬場(ズレなし)、スキップ",
                     race["race_name"],
                     surface,
                 )
                 outcomes.append(
                     (race["course"], race["grade"], race_name,
-                     "スキップ: バイアス導出不可")
+                     "スキップ: いつも通りの馬場")
                 )
                 continue
 
-            matched = match_hot_jockeys(jockeys, all_hot_jockeys)
-            log.info("該当する好調騎手: %s", matched)
-
             time.sleep(SLEEP_BETWEEN_SCRAPE)
             last_styles = fetch_last_run_styles(race["race_id"])
-            combo = get_best_combo(data, surface)
+            v = data.get(surface) or {}
             matched_horses = match_bias_horses(
-                entries, last_styles, combo.get("内外"), combo.get("脚質")
+                entries, last_styles, v.get("frame"), v.get("style")
             )
             log.info("該当馬(枠%s/脚質%s): %s",
-                     combo.get("内外"), combo.get("脚質"), matched_horses)
+                     v.get("frame"), v.get("style"), matched_horses)
 
             text = compose_tweet(
-                race_name, race["course"], bias, matched, matched_horses
+                race_name, race["course"], bias, matched_horses
             )
             log.info("投稿本文:\n%s", text)
 

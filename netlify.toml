@@ -3,17 +3,12 @@
 [build]
   publish = "public"
 
-# ===== メンテナンスモード =====
-# 新アルゴリズム(SQLite一本化)のデータが揃うまで全ページを準備中案内へ。
-# 再開するときはこのルールを削除する。maintenance.html は自己完結
-# (外部アセットはGoogle Fontsのみ)なので force=true で全パスを奪ってよい。
-[[redirects]]
-  from = "/*"
-  to = "/maintenance.html"
-  status = 200
-  force = true
-
 # 拡張子なしURLでもアクセスできるように
+[[redirects]]
+  from = "/bias"
+  to = "/bias.html"
+  status = 200
+
 [[redirects]]
   from = "/about"
   to = "/about.html"
@@ -35,6 +30,13 @@
   for = "/data/site.db"
   [headers.values]
     Cache-Control = "public, max-age=300, must-revalidate"
+
+# gzip版(通常はこちらが使われる。ブラウザ側でDecompressionStream解凍)
+[[headers]]
+  for = "/data/site.db.gz"
+  [headers.values]
+    Cache-Control = "public, max-age=300, must-revalidate"
+    Content-Type = "application/gzip"
 
 # sql.js(WASM)はバージョン更新時のみ変わるので1日キャッシュ
 [[headers]]

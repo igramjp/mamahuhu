@@ -1,103 +1,137 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>なんなの | 馬馬虎虎</title>
-<meta name="description" content="馬馬虎虎(マーマーフーフー)は、JRA結果のゆるい集計サイトです。中国故事「馬馬虎虎」の由来と、サイトの楽しみ方。">
-<link rel="canonical" href="https://mamahuhu.app/about">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分析手法 | 馬馬虎虎</title>
+  <meta name="description" content="馬馬虎虎(マーマーフーフー)の分析手法。相対枠位置・正規化着順・ベースライン乖離・縮小推定・期待値モデルの定義と限界。">
+  <link rel="canonical" href="https://mamahuhu.app/about">
 
-<meta property="og:title" content="なんなの | 馬馬虎虎">
-<meta property="og:description" content="馬馬虎虎(マーマーフーフー)は、JRA結果のゆるい集計サイトです。中国故事「馬馬虎虎」の由来と、サイトの楽しみ方。">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://mamahuhu.app/about">
-<meta property="og:image" content="https://mamahuhu.app/images/thumbnail.jpg">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="馬馬虎虎(マーマーフーフー)">
-<meta property="og:site_name" content="馬馬虎虎">
-<meta property="og:locale" content="ja_JP">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="なんなの | 馬馬虎虎">
-<meta name="twitter:description" content="馬馬虎虎(マーマーフーフー)は、JRA結果のゆるい集計サイトです。中国故事「馬馬虎虎」の由来と、サイトの楽しみ方。">
-<meta name="twitter:image" content="https://mamahuhu.app/images/thumbnail.jpg">
+  <meta property="og:title" content="分析手法 | 馬馬虎虎">
+  <meta property="og:description" content="馬馬虎虎(マーマーフーフー)の分析手法。相対枠位置・正規化着順・ベースライン乖離・縮小推定・期待値モデルの定義と限界。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://mamahuhu.app/about">
+  <meta property="og:image" content="https://mamahuhu.app/images/thumbnail.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="馬馬虎虎(マーマーフーフー)">
+  <meta property="og:site_name" content="馬馬虎虎">
+  <meta property="og:locale" content="ja_JP">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="分析手法 | 馬馬虎虎">
+  <meta name="twitter:description" content="馬馬虎虎(マーマーフーフー)の分析手法。相対枠位置・正規化着順・ベースライン乖離・縮小推定・期待値モデルの定義と限界。">
+  <meta name="twitter:image" content="https://mamahuhu.app/images/thumbnail.jpg">
 
-<link rel="icon" href="/images/favicon.ico" sizes="any">
+  <link rel="icon" href="/images/favicon.ico" sizes="any">
 
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-SR10XVDP3Z"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-SR10XVDP3Z');
-</script>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SR10XVDP3Z"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-SR10XVDP3Z');
+  </script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link
-  href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@100..900&family=Yusei+Magic&display=swap"
-  rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-<header class="masthead">
-  <div class="masthead-inner">
-    <div class="brand">
-      <h1 class="brand-name">
-        <a href="index.html">
-          <img class="logo" src="/images/logo.webp" alt="馬馬虎虎(マーマーフーフー)">
-        </a>
-      </h1>
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="brand">
+        <h1 class="brand-name">
+          <a href="index.html">
+            <img class="logo" src="/images/logo.webp" alt="馬馬虎虎(マーマーフーフー)">
+          </a>
+        </h1>
+      </div>
     </div>
-  </div>
-</header>
+  </header>
 
-<main class="container content-container">
-  <article class="content">
-    <h2 class="section-head">なんなの、このサイト</h2>
+  <main class="container content-container">
+    <article class="content">
+      <h2 class="section-head">分析手法</h2>
 
-    <div class="content-wrapper">
-      <img class="about-image" src="/images/about.webp" alt="馬馬虎虎(マーマーフーフー)">
-      <p><strong>馬馬虎虎(マーマーフーフー)</strong>は、JRA中央競馬の結果をゆるく集計する個人サイトです。</p>
-      <p>馬場の癖、脚質の偏り、人気以上に走った騎手のランキング——そういう「<em>その日の傾向</em>」を毎朝まとめて出します。次の開催に向けて、なんとなく眺めるためのサイトです。</p>
+      <div class="content-wrapper">
+        <p>
+          <strong>馬馬虎虎(マーマーフーフー)</strong>は、JRA中央競馬の期待値分析を公開する個人サイトです。単勝オッズから逆算した市場確率を統計モデルで補正し、市場との見解差(期待値)が明確な馬だけを推奨します。
+        </p>
+        <p>補正の根拠はトラックバイアス——直近開催の枠順・脚質ごとの成績を、過去2〜3年のベースラインからの<strong>乖離(Δ)</strong>として定量化したものです。推奨の結果は単勝回収率で検証し、すべて記録します。
+        </p>
 
-      <h3>名前の由来</h3>
-      <p>「<strong>馬馬虎虎</strong>」は中国の慣用句で、意味は「<em>まあまあ、適当、いい加減</em>」。馬と虎を見分けられずに描いた、いい加減な画家の故事が由来です。</p>
-      <p>世の中には「100%的中!」「極秘情報!」と煽る競馬予想サイトがいっぱいあります。うちは逆です。<strong>ガチ予想はしません</strong>。数字を集計して並べるだけ。馬か虎かを見極めるのはあなた、というスタンスです。</p>
+        <h3>名前の由来</h3>
+        <p>
+          「<strong>馬馬虎虎</strong>」は中国の慣用句で「まあまあ、いい加減」。馬と虎を見分けられずに描いた画家の故事が由来です。名前はいい加減ですが、手法はすべて開示する方針です。的中を演出しない代わりに、定義・標本数・不確実性を隠しません。
+        </p>
 
-      <h3>なにを集計してるの</h3>
-      <ul>
-        <li><strong>枠バイアス</strong> — 内(枠1〜4)と外(枠5〜8)で複勝率はどう違ったか</li>
-        <li><strong>脚質バイアス</strong> — 逃げ先行と差し追込、どっちが決まったか</li>
-        <li><strong>好調騎手</strong> — 複勝圏内(1〜3着)で人気差+5以上のサプライズを記録した騎手。人気差 = 人気 − 着順</li>
-      </ul>
-      <p>芝とダートは分けて集計してます。混ぜると全然違う傾向のものを足し算しちゃうので。画面上で芝/ダートをボタンで切り替えられます。</p>
-      <p>枠も脚質も、もとは3〜4分類が定番ですが、1日6レース(芝orダ各々)だとサンプルが足りずノイズだらけになるので、思い切って2分類にしてます。「<em>まあまあ</em>」のサイトらしい振り切り方です。</p>
+        <h3>期待値分析</h3>
+        <p>
+          本サイトの主役です。単勝オッズは大量の情報を集約した優秀な確率予測であり、これを土台にします(Benter型アプローチ)。モデルが行うのは<strong>市場がまだ織り込んでいないトラックバイアスの補正のみ</strong>です。
+        </p>
+        <ul>
+          <li><strong>市場確率</strong> — 単勝オッズの逆数をレース内で正規化(控除率を除去)した勝率推定</li>
+          <li><strong>モデル確率</strong> — 市場確率の対数オッズに、当該馬の相対枠位置グループのΔを係数倍して加点し、再正規化</li>
+          <li><strong>期待値</strong> —
+            モデル確率×単勝オッズ。市場と同一の確率なら控除率相当(約0.8)に収束するため、<strong>1.1超</strong>は市場との明確な見解差を意味します。該当馬がいないレースは「見送り」</li>
+        </ul>
+        <p>構造上、大半のレースは見送りになります。これは異常ではなく、市場効率性を前提とした場合の合理的な帰結です。</p>
+        <p>
+          補正係数は時系列分割バックテスト(学習2024-01〜2025-06、検証2025-07〜12、テスト2026-01〜06)の条件付きロジットで学習しています。評価は的中率ではなくROI(回収率)・キャリブレーション・対数損失で行います。現行の特徴量(枠順バイアス)による尤度改善は市場に対して統計的に有意ではなく、<strong>市場は枠バイアスをほぼ織り込んでいる</strong>というのが現時点の検証結果です。このため推奨は稀で、見送りが標準的な結論になります。特徴量は検証を通過したものだけを追加します。
+        </p>
+        <p>
+          なお、バックテストは確定オッズで行っています。実際に購入可能な時点のオッズは確定オッズと異なるため、表示される期待値は実運用ではやや甘めの推定になり得ます。
+        </p>
 
-      <h3>使い方のコツ</h3>
-      <p>あくまで「<em>その日</em>」の傾向です。馬場のバイアスは日によって、なんなら同じ日でも前半と後半でガラッと変わります。「土曜はこうだった、日曜も同じとは限らない」くらいで眺めるのが一番です。</p>
-      <p>馬場バイアスは<strong>翌日の同場・近い距離の平場</strong>あたりが効くレンジ。重賞や長距離G1には基本届きません。</p>
-      <p>好調騎手のほうは、距離・クラスにあまり依存せず<strong>翌日に持ち越しやすい</strong>のがウマい使い方。<em>前日穴を開けた騎手は翌日もマーク</em>、という馬券派の感覚に近いものをデータで自動抽出してます。</p>
-      <p>「最大人気差」は数字が大きいほど予想外の好走。1鞍だけのホームラン派と、騎乗数が多くて安定してる派が混ざります。<em>騎乗</em>と<em>勝・複</em>の数字で読み分けてください。</p>
+        <h3>トラックバイアス分析(補正項の推定)</h3>
+        <p>期待値モデルの補正項Δを推定する工程です。バイアス分析ページで全開催ぶんを開示しています。</p>
+        <ul>
+          <li><strong>グループ定義</strong> —
+            枠は枠番ではなく相対枠位置(馬番の順位÷出走頭数)の3分位で内・中・外に分割。頭数の異なるレースを同一尺度で扱えます。脚質は最終コーナー通過順位が頭数の前半なら逃げ先行、後半なら差し追込の2分類</li>
+          <li><strong>指標</strong> — 正規化着順(着順÷出走頭数)のグループ平均と、レース期待値との差。複勝率と違い二値化による情報損失がなく、小標本(1開催日≒12R)でも分散を抑えられます</li>
+          <li><strong>ベースライン</strong> —
+            過去2〜3年の同競馬場・同コース種別のデータを、馬場状態(良/道悪)×距離帯で層別してマッチング。セルの標本が不足する場合は一段粗い層へフォールバックします。路盤改修があった競馬場(例:
+            京都=2023年4月以降)は改修後のみ使用</li>
+          <li><strong>縮小推定</strong> — 当日推定値は経験ベイズ的な部分プーリングでベースライン方向へ縮小(重み n/(n+k)、k=30)。小標本の偶然の偏りを抑えます</li>
+          <li><strong>主指標は乖離Δ</strong> —
+            内枠・先行馬はどの競馬場でも恒常的に有利であり、絶対値の成績はその構造を含んでしまいます。表示するのは縮小推定後の値とベースラインの差(Δ)。負のΔ=ベースラインより有利化、正=不利化です</li>
+          <li><strong>不確実性の開示</strong> —
+            Δには標準誤差にもとづく有意性判定(*=近似95%水準)を付け、レース単位の符号の偏りには二項検定のp値を併記します。有意でない乖離はノイズの可能性が高い、と読んでください</li>
+          <li><strong>距離カテゴリ別</strong> —
+            バイアスは距離帯(短距離≦1400m/マイル〜中距離≦2000m/長距離)によって符号が逆転することもあるため、距離帯別のΔも併記します。1日あたりの距離帯別標本は小さく、縮小が強く効いた保守的な値になります
+          </li>
+          <li><strong>コース替わり</strong> — 柵位置の移動が疑われる開催替わり週は、バイアスが非連続になる可能性を注記します</li>
+        </ul>
+        <p>芝とダートは全工程で分離して扱います。</p>
 
-      <h3>ご注意</h3>
-      <p>分析結果は管理人の独自集計です。馬券の的中を保証するものではありません。投票は20歳以上、自己責任でお願いします。</p>
-    </div>
-  </article>
-</main>
+        <h3>結果検証</h3>
+        <p>推奨馬は単勝100円の均等買いを仮定して的中・回収率を検証し、見送り判断も含めて記録します。単日の回収率は分散が大きいため、モデルの評価は長期のROI(回収率)とキャリブレーション(推定確率と実勝率の一致)で行います。
+        </p>
 
-<footer class="site-footer">
-  <nav class="nav-links">
-    <a href="index.html">どうなの</a>
-    <a href="result.html">どうだった</a>
-    <a href="about.html">なんなの</a>
-    <a href="privacy.html">プライバシー</a>
-  </nav>
-  <p class="copyright">&copy; 2026 馬馬虎虎</p>
-</footer>
+        <h3>限界と免責</h3>
+        <p>トラックバイアスは日次で変動し、降雨・馬場整備・柵移動で非連続に変化します。推定が最も外挿しやすいのは翌日の同競馬場・同コース種別・近い距離帯です。</p>
+        <p>本サイトの分析・期待値は統計的情報の提供であり、的中や収益を保証するものではありません。馬券の購入は20歳以上、自己責任でお願いします。</p>
+      </div>
+    </article>
+  </main>
 
-<script src="nav.js"></script>
+  <footer class="site-footer">
+    <nav class="nav-links">
+      <a href="index.html">期待値分析</a>
+      <a href="bias.html">バイアス分析</a>
+      <a href="result.html">結果検証</a>
+      <a href="about.html">分析手法</a>
+      <a href="privacy.html">プライバシー</a>
+    </nav>
+    <p class="copyright">&copy; 2026 馬馬虎虎</p>
+  </footer>
+
+  <script src="nav.js"></script>
 </body>
+
 </html>

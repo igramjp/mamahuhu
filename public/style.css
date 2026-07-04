@@ -27,12 +27,13 @@ body {
     background: #fff;
     color: #2f2f2f;
     font-family: "Noto Sans JP", sans-serif;
-    font-size: 1.6rem;
+    font-size: 1.45rem;
     font-weight: 400;
     font-feature-settings: "palt" 1;
     font-variant-east-asian: proportional-width;
     font-synthesis: none;
-    line-height: normal;
+    line-height: 1.8;
+    letter-spacing: 0.04em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-size-adjust: 100%;
@@ -48,12 +49,9 @@ h4,
 h5,
 h6 {
     display: inline-block;
-    font-family: "Dela Gothic One", sans-serif;
-    font-size: 1.75em;
-    font-weight: 400;
-    transform: scale(0.82, 1.18);
-    transform-origin: left center;
-    transform-box: fill-box;
+    font-family: "Noto Sans JP", sans-serif;
+    font-weight: 700;
+    font-size: 1.05em;
 }
 
 strong {
@@ -74,9 +72,6 @@ header {
 
 header h1 {
     display: block !important;
-    transform: scale(1, 1) !important;
-    transform-origin: center center !important;
-    transform-box: fill-box !important;
 }
 
 .logo {
@@ -137,8 +132,8 @@ main {
     position: relative;
     width: 100%;
     height: auto;
-    background: #d0d0d0;
-    padding: 0 22px 27.5px 22px;
+    background: #fff;
+    padding: 0 22px 16px 22px;
     text-align: center;
 }
 
@@ -146,11 +141,11 @@ main {
     display: block;
     width: 100%;
     max-width: 660px;
-    height: 66px;
+    height: 46px;
     margin: 0 auto;
-    background: #767676;
+    background: #2f2f2f;
     color: #fff;
-    border-radius: 16.5px;
+    border-radius: 8px;
     border: none;
     text-decoration: none;
     text-align: center;
@@ -160,24 +155,17 @@ main {
     display: inline-block;
     width: 100%;
     height: 100%;
-    line-height: 64px;
+    line-height: 46px;
     color: #fff;
-    font-family: "Dela Gothic One", sans-serif;
-    font-size: 3rem;
+    font-family: "Noto Sans JP", sans-serif;
     font-weight: 700;
-    transform: scale(0.82, 1.18);
-    transform-origin: center center;
-    transform-box: fill-box;
+    font-size: 1.45rem;
 }
 
-@media (max-width: 420px) {
-    .link-button a span {
-        font-size: 2.5rem;
-    }
-}
+
 
 .link-button a:hover {
-    background: #2f2f2f;
+    background: #555;
 }
 
 .link-button a:hover span {
@@ -229,16 +217,16 @@ footer {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #d0d0d0;
-    padding: 55px 22px 38.5px 22px;
-    gap: 55px;
+    background: #fff;
+    padding: 16px 22px 48px 22px;
+    gap: 48px;
 }
 
 section.lede {
     overflow: hidden;
     position: relative;
     width: 100%;
-    height: calc(100vh - 88px);
+    height: auto;
     padding: 0 22px;
 }
 
@@ -275,13 +263,10 @@ section.lede {
     width: max-content;
     height: auto;
     display: inline-block;
-    font-family: "Dela Gothic One", sans-serif;
-    font-size: 1.25em;
-    font-weight: 400;
+    font-family: "Noto Sans JP", sans-serif;
+    font-weight: 700;
+    font-size: 1em;
     line-height: 1.5;
-    transform: scale(0.82, 1.18);
-    transform-origin: left center;
-    transform-box: fill-box;
 }
 
 .buttons-container {
@@ -355,41 +340,39 @@ section.section {
     max-width: 660px;
     height: auto;
     margin: 0 auto;
-    padding: 27.5px 27.5px 44px 27.5px;
-    border-radius: 33px;
-    background: #fff;
-    scroll-margin-top: 44px;
+    padding: 0;
+    background: none;
+    scroll-margin-top: 24px;
 }
 
-@media (max-width: 420px) {
-    section.section {
-        padding: 27.5px 22px 44px 22px;
-    }
-}
+
 
 .section-head {
-    overflow: visible;
-    position: relative;
-    width: max-content;
+    display: block;
+    position: static;
+    width: auto;
     height: auto;
-    top: -44px;
-    left: -44px;
-    background: #2f2f2f;
-    color: #fff;
-    font-size: 2em;
-    padding: 2.36px 27.5px 4.36px 27.5px;
-    line-height: 1.5;
-    border-radius: 16.5px;
+    background: none;
+    color: #2f2f2f;
+    font-size: 1.15em;
+    letter-spacing: 0.08em;
+    padding: 0 0 10px 0;
+    line-height: 1.4;
+    border-bottom: 2px solid #2f2f2f;
+    margin-bottom: 20px;
 }
 
 .section-sub {
-    position: relative;
-    top: -27.5px;
+    position: static;
+    color: #767676;
+    font-size: 0.85em;
+    line-height: 1.9;
+    margin-bottom: 20px;
 }
 
 .surface-header {
     position: relative;
-    top: -5.5px;
+    top: 0;
 }
 
 .result-report .surface-header {
@@ -408,17 +391,13 @@ section.section {
     height: auto;
     background: #d0d0d0;
     color: #2f2f2f;
-    font-family: "Dela Gothic One", sans-serif;
-    font-size: 1.25em;
-    font-weight: 400;
-    transform: scale(0.82, 1.18);
-    transform-origin: left center;
-    transform-box: fill-box;
-    padding: 0 16.5px;
-    line-height: 1.5;
-    border-radius: 11px;
-    margin-bottom: 2.75px;
-    left: -16px;
+    font-family: "Noto Sans JP", sans-serif;
+    font-weight: 700;
+    font-size: 0.85em;
+    padding: 1px 10px;
+    line-height: 1.6;
+    border-radius: 4px;
+    margin-bottom: 4px;
 }
 
 .best-combo {
@@ -432,13 +411,10 @@ section.section {
 
 .best-combo b {
     display: inline-block;
-    font-family: "Dela Gothic One", sans-serif;
-    font-size: 1.5em;
-    font-weight: 400;
-    line-height: 1.25;
-    transform: scale(0.82, 1.18);
-    transform-origin: left center;
-    transform-box: fill-box;
+    font-family: "Noto Sans JP", sans-serif;
+    font-weight: 700;
+    font-size: 1.05em;
+    line-height: 1.4;
 }
 
 .best-combo small {
@@ -447,7 +423,6 @@ section.section {
     font-size: 0.75em;
     font-weight: 400;
     line-height: 1.25;
-    left: -22px;
     bottom: -1px;
 }
 
@@ -461,7 +436,8 @@ section.section {
 }
 
 .sub-head {
-    margin: 22px 0 5.5px 0;
+    letter-spacing: 0.06em;
+    margin: 30px 0 10px 0;
 }
 
 table.data-table {
@@ -474,29 +450,37 @@ table.data-table {
 }
 
 table.data-table thead tr:first-child {
-    border-bottom: 3px solid #d0d0d0;
+    border-bottom: 2px solid #2f2f2f;
 }
 
 table.data-table thead tr th {
     color: #767676;
+    font-size: 0.8em;
+    font-weight: 500;
+    letter-spacing: 0.08em;
     text-align: left;
-    padding: 5.5px 0;
+    padding: 8px 0;
 }
 
 table.data-table thead tr th:not(:first-child) {
     text-align: right;
 }
 
+table.data-table thead tr th:nth-child(2) {
+    text-align: left;
+}
+
 table.data-table tbody tr {
-    border-bottom: 3px dotted #d0d0d0;
+    border-bottom: 1px solid #e5e4e0;
 }
 
 table.data-table tbody tr td {
-    font-family: "Yusei Magic", sans-serif;
-    font-size: 1.25em;
+    font-family: "Noto Sans JP", sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95em;
     font-weight: 400;
-    line-height: 1.25;
-    padding: 11px 0;
+    line-height: 1.6;
+    padding: 10px 0;
 }
 
 table.data-table tbody tr td:not(:first-child) {
@@ -542,8 +526,8 @@ main.content-container {
     position: relative;
     width: 100%;
     height: auto;
-    background: #d0d0d0;
-    padding: 55px 22px;
+    background: #fff;
+    padding: 8px 22px 24px 22px;
 }
 
 article.content {
@@ -553,9 +537,8 @@ article.content {
     height: auto;
     max-width: 660px;
     margin: 0 auto;
-    background: #fff;
-    padding: 27.5px;
-    border-radius: 33px;
+    background: none;
+    padding: 0;
 }
 
 article.content h3 {
@@ -571,7 +554,6 @@ article.content ul {
     position: relative;
     width: 100%;
     height: auto;
-    top: -27.5px;
 }
 
 .content-wrapper h3 {
@@ -608,14 +590,11 @@ section.lede.lede-compact {
 
 .result-headline b {
     display: inline-block;
-    font-family: "Dela Gothic One", sans-serif;
-    font-size: 1.5em;
-    font-weight: 400;
-    line-height: 1.25;
-    transform: scale(0.82, 1.18);
-    transform-origin: left center;
-    transform-box: fill-box;
-    margin: 0 8px;
+    font-family: "Noto Sans JP", sans-serif;
+    font-weight: 700;
+    font-size: 1.05em;
+    line-height: 1.4;
+    margin: 0 4px;
 }
 
 .chips {
@@ -631,8 +610,8 @@ section.lede.lede-compact {
     font-family: "Noto Sans JP", sans-serif;
     font-size: 0.7em;
     font-weight: 700;
-    padding: 1.5px 9px 1.5px 9px;
-    border-radius: 8px;
+    padding: 1px 8px 2.5px 8px;
+    border-radius: 4px;
     vertical-align: middle;
     line-height: 1.5;
 }
@@ -652,7 +631,7 @@ table.data-table.result-table {
 }
 
 table.data-table.result-table tbody tr:nth-child(3n) {
-    border-bottom: 3px solid #d0d0d0;
+    border-bottom: 1px solid #c9c8c4;
 }
 
 table.data-table.result-table tbody tr td {
@@ -719,20 +698,16 @@ table.data-table.result-table tbody tr td.rank-cell {
 /* 注目レース */
 .notable-race-head {
     position: relative;
-    top: -5.5px;
-    margin-bottom: 11px;
+    margin-bottom: 10px;
 }
 
 .notable-race-name {
     display: block;
-    font-family: "Dela Gothic One", sans-serif;
-    font-size: 1.5em;
-    font-weight: 400;
-    line-height: 1.25;
-    transform: scale(0.82, 1.18);
-    transform-origin: left center;
-    transform-box: fill-box;
-    margin-top: 5.5px;
+    font-family: "Noto Sans JP", sans-serif;
+    font-weight: 700;
+    font-size: 1.05em;
+    line-height: 1.4;
+    margin-top: 4px;
 }
 
 .notable-meta {
@@ -778,4 +753,570 @@ table.data-table.notable-race-table tbody tr td.horse-chips-cell {
 
 table.data-table.notable-race-table tbody tr td.horse-chips-cell .chips {
     justify-content: flex-end;
+}
+
+/* ===== 2026-07 UI刷新: 馬場よみ(deviationメーター) ===== */
+:root {
+    /* ダイバージング配色(検証済み: CVD ΔE 74.6, コントラスト3:1+) */
+    --dev-plus: #e34948;
+    /* いつもより来てる(有利化) */
+    --dev-minus: #2a78d6;
+    /* いつもより来てない(不利化) */
+    --dev-neutral: #f0efec;
+    /* いつも通り(中立) */
+    --dev-track: #ececea;
+}
+
+.yomi-verdict {
+    font-family: "Noto Sans JP", sans-serif;
+    font-weight: 700;
+    font-size: 1.1em;
+    line-height: 1.5;
+    margin: 2px 0 10px 0;
+}
+
+.yomi-verdict b {
+    color: var(--dev-plus);
+    font-weight: 900;
+}
+
+.yomi-scale {
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 0.55em;
+    font-weight: 500;
+    color: #767676;
+    vertical-align: middle;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+.dev-meter {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 10px 0 6px 0;
+}
+
+.dev-row {
+    display: grid;
+    grid-template-columns: 4.5em 1fr 7.5em;
+    align-items: center;
+    gap: 10px;
+}
+
+.dev-label {
+    font-family: "Noto Sans JP", sans-serif;
+    font-weight: 500;
+    font-size: 0.95em;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.dev-track {
+    position: relative;
+    height: 12px;
+    background: var(--dev-track);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.dev-center {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: #fff;
+    z-index: 1;
+}
+
+.dev-bar {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    border-radius: 4px;
+    min-width: 4px;
+}
+
+.dev-bar.plus {
+    background: var(--dev-plus);
+}
+
+.dev-bar.minus {
+    background: var(--dev-minus);
+}
+
+.dev-bar.flat {
+    background: #c9c8c4;
+}
+
+.dev-word {
+    font-size: 0.8em;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.dev-word.plus {
+    color: #c22f2e;
+}
+
+.dev-word.minus {
+    color: #1c5cab;
+}
+
+.dev-word.flat {
+    color: #767676;
+}
+
+.dev-confidence {
+    font-size: 0.85em;
+    color: #2f2f2f;
+    margin: 8px 0 12px 0;
+}
+
+.dev-confidence b {
+    font-family: "Noto Sans JP", sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 1em;
+    font-weight: 700;
+}
+
+.yomi-foot {
+    font-size: 0.75em;
+    color: #767676;
+    line-height: 1.9;
+    margin-top: 24px;
+}
+
+.yomi-note {
+    background: #fdf3e7;
+    border-radius: 6px;
+    font-size: 0.85em;
+    line-height: 1.8;
+    padding: 10px 14px;
+    margin-top: 16px;
+}
+
+.yomi-pending {
+    background: var(--dev-neutral);
+    border-radius: 6px;
+    font-size: 0.85em;
+    line-height: 1.6;
+    padding: 8px 12px;
+    margin-bottom: 16.5px;
+}
+
+@media (max-width: 420px) {
+    .dev-row {
+        grid-template-columns: 3.6em 1fr 6.5em;
+        gap: 6px;
+    }
+
+    .yomi-scale {
+        display: block;
+        margin: 2px 0 0 0;
+    }
+}
+
+/* ===== どうする(期待値ベース予想) ===== */
+.pred-summary {
+    font-size: 1em;
+    line-height: 1.8;
+    margin-bottom: 18px;
+}
+
+.pred-summary b {
+    font-family: "Noto Sans JP", sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.05em;
+    font-weight: 700;
+}
+
+.pred-race {
+    border-top: 1px solid #e5e4e0;
+    padding: 14px 0;
+}
+
+.pred-race:last-of-type {
+    border-bottom: 1px solid #e5e4e0;
+}
+
+.pred-race summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.pred-race summary::-webkit-details-marker {
+    display: none;
+}
+
+.pred-race-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.race-no-tag {
+    font-family: "Noto Sans JP", sans-serif;
+    font-weight: 700;
+    font-size: 1em;
+    min-width: 36px;
+}
+
+.pred-race-name {
+    font-weight: 700;
+    font-size: 0.9em;
+    flex: 1;
+    min-width: 90px;
+}
+
+.surface-tag-mini {
+    background: #d0d0d0;
+    color: #2f2f2f;
+    font-size: 0.7em;
+    font-weight: 700;
+    padding: 1.5px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.verdict-chip {
+    font-size: 0.7em;
+    font-weight: 700;
+    padding: 1.5px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.verdict-reco {
+    background: var(--dev-plus);
+    color: #fff;
+}
+
+.verdict-pass {
+    background: #fff;
+    color: #767676;
+    border: 1px solid #d0d0d0;
+}
+
+table.data-table.pred-table {
+    margin-top: 8px;
+}
+
+table.data-table.pred-table thead tr th,
+table.data-table.pred-table tbody tr td {
+    width: auto !important;
+    min-width: 0 !important;
+}
+
+table.data-table.pred-table tbody tr td {
+    font-size: 1em;
+    padding: 8px 0;
+    vertical-align: middle;
+}
+
+table.data-table.pred-table td.horse-name-cell {
+    font-weight: 500;
+    text-align: left;
+    font-family: "Noto Sans JP", sans-serif;
+}
+
+table.data-table.pred-table td.num-cell {
+    font-family: "Noto Sans JP", sans-serif;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+
+td.num-cell.ev-hot {
+    color: #c22f2e;
+    font-weight: 700;
+}
+
+td.num-cell.ev-warm {
+    color: #2f2f2f;
+}
+
+.reco-row {
+    background: #fdf0f0;
+}
+
+.reco-chip {
+    margin-left: 6px;
+    font-size: 0.6em;
+    vertical-align: middle;
+}
+
+.model-badge {
+    display: inline-block;
+    background: #f0efec;
+    color: #767676;
+    font-size: 0.7em;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+/* ===== 科学的表現UI(乖離Δ・有意性・距離カテゴリ別) ===== */
+.dev-num {
+    display: block;
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 0.78em;
+    font-weight: 500;
+    color: #767676;
+}
+
+.dev-num b {
+    color: #2f2f2f;
+    font-weight: 900;
+}
+
+.yomi-verdict-stat {
+    display: inline-block;
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 0.5em;
+    font-weight: 500;
+    color: #767676;
+    margin-left: 8px;
+}
+
+table.data-table.dist-table thead tr th,
+table.data-table.dist-table tbody tr td {
+    width: auto !important;
+    min-width: 0 !important;
+}
+
+table.data-table.dist-table tbody tr td {
+    font-size: 0.9em;
+    padding: 8px 0;
+}
+
+table.data-table.dist-table td.dist-cat-cell {
+    font-family: "Noto Sans JP", sans-serif;
+    font-size: 0.85em;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+}
+
+table.data-table.dist-table td.dist-cat-cell small {
+    font-weight: 500;
+    color: #767676;
+}
+
+table.data-table.dist-table td.num-cell {
+    font-family: "Noto Sans JP", sans-serif;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+
+td.num-cell.dist-plus {
+    color: #c22f2e;
+}
+
+td.num-cell.dist-minus {
+    color: #1c5cab;
+}
+
+td.num-cell.dist-flat {
+    color: #767676;
+}
+
+.yomi-foot-min {
+    font-size: 0.72em;
+    color: #767676;
+    line-height: 1.6;
+    margin-top: 4px;
+}
+
+.notable-section {
+    margin-top: 0;
+}
+
+@media (max-width: 420px) {
+    table.data-table.dist-table td.dist-cat-cell small {
+        display: block;
+    }
+}
+
+/* ===== 結果検証(推奨馬の的中・回収率) ===== */
+.verify-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 22px;
+}
+
+.verify-stat {
+    background: #f5f4f2;
+    border-radius: 6px;
+    padding: 10px 6px;
+    text-align: center;
+}
+
+.verify-stat-num {
+    display: block;
+    font-family: "Noto Sans JP", sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.3em;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.verify-stat-num small {
+    font-size: 0.6em;
+    color: #767676;
+}
+
+.verify-stat-num.roi-plus {
+    color: #c22f2e;
+}
+
+.verify-stat-label {
+    display: block;
+    font-size: 0.68em;
+    font-weight: 500;
+    color: #767676;
+    margin-top: 2px;
+}
+
+.verify-pass-race {
+    opacity: 0.75;
+}
+
+.verify-hit-row {
+    background: #fdf0f0;
+}
+
+.verify-outcome-cell {
+    text-align: right;
+}
+
+.verify-outcome-cell .chips {
+    justify-content: flex-end;
+}
+
+@media (max-width: 420px) {
+    .verify-stat-num {
+        font-size: 1.1em;
+    }
+}
+
+
+/* ===== レポート調の微調整 ===== */
+.lede-text {
+    font-weight: 700;
+    font-size: 1.05em;
+    letter-spacing: 0.06em;
+    line-height: 2;
+}
+
+.lede-meaning {
+    color: #767676;
+    font-size: 0.8em;
+    letter-spacing: 0.05em;
+    margin-top: 12px;
+}
+
+.date-display {
+    margin-top: 14px;
+}
+
+.date-display span {
+    color: #767676;
+}
+
+section.lede.lede-compact {
+    padding-top: 16px;
+    padding-bottom: 8px;
+}
+
+
+/* ===== 和文組版の余白(記事・本文) ===== */
+.content-wrapper p {
+    margin-bottom: 1.5em;
+}
+
+.content-wrapper h3 {
+    display: block;
+    letter-spacing: 0.06em;
+    border-left: 3px solid #2f2f2f;
+    padding-left: 10px;
+    margin: 2.8em 0 1em 0;
+}
+
+article.content h3 {
+    margin-top: 2.8em;
+}
+
+.content-wrapper>p:first-of-type {
+    margin-top: 0;
+}
+
+.content-wrapper ul {
+    padding-left: 1.5em;
+    margin-bottom: 1.5em;
+}
+
+.content-wrapper li {
+    line-height: 1.9;
+    margin-bottom: 0.7em;
+}
+
+.content-wrapper li:last-child {
+    margin-bottom: 0;
+}
+
+.prose-meta {
+    color: #767676;
+    font-size: 0.8em;
+    margin-top: 3em;
+}
+
+/* チップ・タグの字間 */
+.chip,
+.verdict-chip,
+.surface-tag-mini,
+.surface-tag {
+    letter-spacing: 0.03em;
+}
+
+/* フッターの字間 */
+.nav-links a {
+    letter-spacing: 0.06em;
+}
+
+.copyright {
+    letter-spacing: 0.08em;
+}
+
+
+/* ===== データパネル(競馬場ごとの図表ブロック) =====
+   地の文(定義・読み方・記事)は枠なし、データのまとまりだけ
+   ヘアラインで囲む(レポートの図表枠)。 */
+section.section.panel {
+    border: 1px solid #e0dfdb;
+    border-radius: 6px;
+    padding: 18px 18px 22px 18px;
+}
+
+@media (max-width: 420px) {
+    section.section.panel {
+        padding: 14px 12px 18px 12px;
+    }
+}
+
+/* 表頭は正式名称(市場確率等)で折り返し可。下揃えで桁と整列 */
+table.data-table.pred-table thead tr th {
+    vertical-align: bottom;
+    line-height: 1.3;
+}
+
+table.data-table.pred-table thead tr th:not(:first-child):not(:nth-child(2)) {
+    text-align: right;
 }

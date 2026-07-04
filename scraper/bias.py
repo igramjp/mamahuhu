@@ -123,13 +123,15 @@ def prepare(df):
 
 # ---------- 集計コア ----------
 def group_deltas(df, key, labels):
-    """グループごとの delta 平均と頭数。finish が無い馬(中止等)は除外。"""
+    """グループごとの delta 平均・標準誤差・頭数。finishが無い馬(中止等)は除外。"""
     sub = df.dropna(subset=["delta"])
     out = {}
     for label in labels:
         grp = sub[sub[key] == label]
         if len(grp):
-            out[label] = {"delta": float(grp["delta"].mean()), "n": int(len(grp))}
+            se = float(grp["delta"].std(ddof=1) / len(grp) ** 0.5) if len(grp) >= 2 else None
+            out[label] = {"delta": float(grp["delta"].mean()),
+                          "se": se, "n": int(len(grp))}
     return out
 
 
@@ -170,22 +172,25 @@ def baseline_for_races(base_df, day_races, key, labels):
 
 
 def shrink(recent, baseline, k=SHRINK_K):
-    """直近の推定値を長期ベースラインに向けて縮小。
+    """直近の推定値を長期ベースラインに向けて縮小(経験ベイズ的な部分プーリング)。
     adjusted = (n*recent + k*baseline) / (n + k)"""
     out = {}
     for label, r in recent.items():
         b = baseline.get(label)
         if b is None:
             out[label] = {**r, "baseline_delta": None, "adjusted_delta": r["delta"],
-                          "deviation": None}
+                          "deviation": None, "dev_se": None}
             continue
         n = r["n"]
-        adj = (n * r["delta"] + k * b["delta"]) / (n + k)
-        # deviation = 縮小後の「いつもとのズレ」。絶対値のadjusted_deltaは
+        w = n / (n + k)
+        adj = w * r["delta"] + (1 - w) * b["delta"]
+        # deviation = 縮小後の「ベースラインとの乖離」。絶対値のadjusted_deltaは
         # 「前にいる馬・内の馬は常に着順が良い」という恒常的な相関を含むため、
-        # 馬場読み(今日は特別内有利か?)にはこちらを使う。
+        # トラックバイアスの表示にはこちらを使う。
+        # dev_se: ベースラインを既知とみなした近似(deviation = w×(recent−base))
+        dev_se = w * r["se"] if r.get("se") is not None else None
         out[label] = {**r, "baseline_delta": b["delta"], "adjusted_delta": adj,
-                      "deviation": adj - b["delta"]}
+                      "deviation": adj - b["delta"], "dev_se": dev_se}
     return out
 
 
@@ -230,6 +235,32 @@ def build_bias_report(conn, place, target_date=None):
         date_from = max(date_from, RESET_DATES[place])
     base_all = load_horses(conn, place=place, date_from=date_from, date_to=target_date)
 
+    KINDS = [
+        ("frame3", ["内", "中", "外"], ("内", "外"), "frame_bias"),
+        ("style", ["逃げ先行", "差し追込"], ("逃げ先行", "差し追込"), "style_bias"),
+    ]
+
+    def analyze_subset(sub, base, day_races):
+        """1つのサブセット(全体 or 距離カテゴリ)の frame/style 推定を返す。"""
+        out = {}
+        for key, labels, favor_pair, name in KINDS:
+            recent = group_deltas(sub, key, labels)
+            if not base.empty:
+                baseline, levels = baseline_for_races(base, day_races, key, labels)
+            else:
+                baseline, levels = {}, {}
+            merged = shrink(recent, baseline)
+            favor, total = per_race_favor(sub, key, *favor_pair)
+            out[name] = {
+                "groups": [{"group": g, **{k: (round(v, 4) if isinstance(v, float) else v)
+                                           for k, v in merged[g].items()}}
+                           for g in labels if g in merged],
+                "confidence": {"favor_label": favor_pair[0], "favor_races": favor,
+                               "total_races": total},
+                "baseline_levels": levels,
+            }
+        return out
+
     surfaces = {}
     for surface in SURFACES:
         sub = day[day["surface"] == surface]
@@ -241,26 +272,21 @@ def build_bias_report(conn, place, target_date=None):
         result = {"race_count": int(sub["race_id"].nunique()),
                   "n_horses": int(sub["delta"].notna().sum()),
                   "baseline_n": int(len(base.dropna(subset=["delta"]))) if not base.empty else 0}
+        result.update(analyze_subset(sub, base, day_races))
 
-        for key, labels, favor_pair, name in [
-            ("frame3", ["内", "中", "外"], ("内", "外"), "frame_bias"),
-            ("style", ["逃げ先行", "差し追込"], ("逃げ先行", "差し追込"), "style_bias"),
-        ]:
-            recent = group_deltas(sub, key, labels)
-            if not base.empty:
-                baseline, levels = baseline_for_races(base, day_races, key, labels)
-            else:
-                baseline, levels = {}, {}
-            merged = shrink(recent, baseline)
-            favor, total = per_race_favor(sub, key, *favor_pair)
-            result[name] = {
-                "groups": [{"group": g, **{k: (round(v, 4) if isinstance(v, float) else v)
-                                           for k, v in merged[g].items()}}
-                           for g in labels if g in merged],
-                "confidence": {"favor_label": favor_pair[0], "favor_races": favor,
-                               "total_races": total},
-                "baseline_levels": levels,
+        # 距離カテゴリ別の内訳。1日あたりのnが小さいため縮小が強く効く
+        # (=ベースライン寄りの保守的な推定になる)。表示側でnを明示する。
+        by_distance = {}
+        for cat in ["短距離", "マイル〜中距離", "長距離"]:
+            sub_cat = sub[sub["dist_cat"] == cat]
+            if sub_cat.empty:
+                continue
+            dr_cat = day_races[day_races["dist_cat"] == cat]
+            by_distance[cat] = {
+                "race_count": int(sub_cat["race_id"].nunique()),
+                **analyze_subset(sub_cat, base, dr_cat),
             }
+        result["by_distance"] = by_distance
         surfaces[surface] = result
 
     # コース替わり注記(A/B/C柵は未取得のため開催替わりで代用)
@@ -282,14 +308,35 @@ def build_bias_report(conn, place, target_date=None):
     }
 
 
+def export_to_site(raw_conn, site_conn, place, target_date=None):
+    """バイアスレポートを計算して site.db の bias3_* テーブルへ書き込む。"""
+    import site_db
+    report = build_bias_report(raw_conn, place, target_date)
+    if report is None:
+        return None
+    site_db.write_bias3(site_conn, report)
+    return report
+
+
 def main():
     ap = argparse.ArgumentParser(description="新バイアス集計(SQLiteベース)")
     ap.add_argument("place", help="競馬場名(東京など)")
     ap.add_argument("--date", default=None, help="YYYYMMDD(未指定なら最新)")
     ap.add_argument("--db", dest="db_path", default=None)
+    ap.add_argument("--export", action="store_true",
+                    help="site.db の bias3_* テーブルへ書き込む")
     args = ap.parse_args()
 
     conn = db.connect(args.db_path)
+    if args.export:
+        import site_db
+        site_conn = site_db.connect()
+        report = export_to_site(conn, site_conn, args.place, args.date)
+        if report is None:
+            print(f"{args.place} のデータがありません")
+            return
+        print(f"export: {report['date']}_{report['place']} → site.db bias3_*")
+        return
     report = build_bias_report(conn, args.place, args.date)
     if report is None:
         print(f"{args.place} のデータがありません")

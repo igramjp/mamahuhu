@@ -1,18 +1,31 @@
-// site.db (SQLite) データ層。sql.js(WASM)で public/data/site.db を読み、
-// 旧JSONと同じ形のオブジェクトを組み立てて app.js / result.js に渡す。
-// 旧 {date}_結果.json は保存せず、ここで race_top3(当日) ×
-// bias_rows/hot_jockeys(直近開催日) から導出する(scrape.pyの旧build_kekka移植)。
+// site.db (SQLite) データ層。sql.js(WASM)で public/data/site.db を読む。
+// すべて新集計(bias3 = 相対枠位置3分割×正規化着順のdeviation)ベース。
+// 結果検証は pred_horses.rank(確定着順)から導出する。
 (function () {
   let db = null;
+
+  // gzip版を優先して取得(Netlifyはバイナリを自動圧縮しないため)。
+  // DecompressionStream非対応・取得失敗時は生のsite.dbへフォールバック。
+  async function fetchDb() {
+    if (typeof DecompressionStream === "function") {
+      try {
+        const r = await fetch("data/site.db.gz");
+        if (r.ok && r.body) {
+          const stream = r.body.pipeThrough(new DecompressionStream("gzip"));
+          return await new Response(stream).arrayBuffer();
+        }
+      } catch (e) { /* フォールバックへ */ }
+    }
+    const r = await fetch("data/site.db");
+    if (!r.ok) throw new Error(`${r.status} data/site.db`);
+    return r.arrayBuffer();
+  }
 
   async function open() {
     if (db) return;
     const [SQL, buf] = await Promise.all([
       initSqlJs({ locateFile: (f) => `vendor/sqljs/${f}` }),
-      fetch("data/site.db").then((r) => {
-        if (!r.ok) throw new Error(`${r.status} data/site.db`);
-        return r.arrayBuffer();
-      }),
+      fetchDb(),
     ]);
     db = new SQL.Database(new Uint8Array(buf));
   }
@@ -26,70 +39,23 @@
     return out;
   }
 
-  // ---- 一覧(旧index.json相当) ----
+  // ---- 開催インデックス ----
   function indexItems() {
     return rows(
       "SELECT date, place FROM reports ORDER BY date DESC, place ASC",
     );
   }
 
-  // ---- 場別レポート(旧{date}_{place}.json相当) ----
+  // ---- 場別レポート(top3・注目レース) ----
   function report(date, place) {
     const rep = rows(
       "SELECT * FROM reports WHERE date = ? AND place = ?", [date, place],
     )[0];
     if (!rep) return null;
 
-    const surfaces = {};
-    for (const s of rows(
-      "SELECT * FROM surface_stats WHERE date = ? AND place = ?", [date, place],
-    )) {
-      const bias = (kind, key) =>
-        rows(
-          `SELECT grp, win_rate, show_rate, n FROM bias_rows
-           WHERE date = ? AND place = ? AND surface = ? AND kind = ?
-           ORDER BY CASE grp WHEN '内' THEN 0 WHEN '逃げ先行' THEN 0 ELSE 1 END`,
-          [date, place, s.surface, kind],
-        ).map((r) => ({
-          [key]: r.grp, 勝率: r.win_rate, 複勝率: r.show_rate, 出走数: r.n,
-        }));
-      surfaces[s.surface] = {
-        race_count: s.race_count,
-        frame_bias: bias("frame", "内外"),
-        style_bias: bias("style", "脚質"),
-        best_combo: s.best_combo_frame
-          ? { 内外: s.best_combo_frame, 脚質: s.best_combo_style,
-              複勝率: s.best_combo_rate, 出走数: s.best_combo_n }
-          : null,
-      };
-    }
-
-    const hotJockeys = rows(
-      `SELECT * FROM hot_jockeys WHERE date = ? AND place = ?
-       ORDER BY max_pop_diff DESC, jockey`, [date, place],
-    ).map((r) => ({
-      騎手: r.jockey, 最大人気差: r.max_pop_diff,
-      騎乗数: r.rides, 勝利: r.wins, 複勝: r.shows,
-    }));
-
-    const races = [];
-    for (const r of rows(
-      `SELECT * FROM race_top3 WHERE date = ? AND place = ?
-       ORDER BY race_no, rank, umaban`, [date, place],
-    )) {
-      let race = races[races.length - 1];
-      if (!race || race.R !== r.race_no) {
-        race = { R: r.race_no, surface: r.surface, race_name: r.race_name, top3: [] };
-        races.push(race);
-      }
-      race.top3.push({
-        着順: r.rank, 馬番: r.umaban, 内外: r.frame_io, 脚質: r.style, 騎手: r.jockey,
-      });
-    }
-
     const out = {
       place, date, source: rep.source, generated_at: rep.generated_at,
-      total_races: rep.total_races, surfaces, hot_jockeys: hotJockeys, races,
+      total_races: rep.total_races,
     };
 
     const nr = rows(
@@ -103,124 +69,162 @@
           `SELECT * FROM notable_entries WHERE date = ? AND place = ?
            ORDER BY umaban`, [date, place],
         ).map((e) => ({
-          枠: e.waku, 馬番: e.umaban, 馬名: e.horse, 騎手: e.jockey,
-          内外: e.frame_io, 脚質: e.style,
+          枠: e.waku, 馬番: e.umaban, 馬名: e.horse, 騎手: e.jockey, 脚質: e.style,
         })),
       };
     }
     return out;
   }
 
-  // ---- 結果ふりかえり(旧{date}_結果.json相当を導出) ----
-  const FRAME_LABEL = { 内: "内枠", 外: "外枠" };
+  // ---- 新バイアス集計(bias3_*) ----
+  // 戻り値: {surfaces: {芝: {frame: {groups, meta}, style: {groups, meta},
+  //          byDistance: {短距離: {frame: {groups}, style: {groups}}, ...}}}, notes:[...]}
+  // frame/style 直下は当日全体(dist_cat='ALL')の推定。
+  const GRP_ORDER = { 内: 0, 中: 1, 外: 2, 逃げ先行: 0, 差し追込: 1 };
+  const DIST_ORDER = { 短距離: 0, "マイル〜中距離": 1, 長距離: 2 };
 
-  function stripJockeyMark(name) {
-    return (name || "").replace(/^[▲★△◇▽◎○☆▼]+/, "").trim();
-  }
-
-  function jockeyInHotSet(jockey, hotNames) {
-    const j = stripJockeyMark(jockey);
-    if (!j) return false;
-    for (const hn of hotNames) {
-      const hnn = stripJockeyMark(hn);
-      if (!hnn) continue;
-      if (hnn.startsWith(j) || j.startsWith(hnn)) return true;
+  function bias3(date, place) {
+    const stats = rows(
+      `SELECT * FROM bias3_stats WHERE date = ? AND place = ?`, [date, place]);
+    if (!stats.length) return null;
+    const surfaces = {};
+    for (const r of stats) {
+      const s = (surfaces[r.surface] ||= { byDistance: {} });
+      const k = r.kind === "frame3" ? "frame" : "style";
+      const holder = r.dist_cat === "ALL"
+        ? s
+        : (s.byDistance[r.dist_cat] ||= {});
+      const block = (holder[k] ||= { groups: [], meta: null });
+      block.groups.push({
+        grp: r.grp, recent: r.recent_delta, baseline: r.baseline_delta,
+        adjusted: r.adjusted_delta, deviation: r.deviation,
+        se: r.dev_se, n: r.n,
+      });
     }
-    return false;
-  }
-
-  function prevDate(targetDate) {
-    const r = rows(
-      "SELECT MAX(date) AS d FROM reports WHERE date < ?", [targetDate],
-    )[0];
-    return (r && r.d) || null;
-  }
-
-  function winningEntry(biasRows) {
-    if (!biasRows.length) return null;
-    return biasRows.sort(
-      (a, b) => b.show_rate - a.show_rate || b.n - a.n,
-    )[0].grp;
-  }
-
-  function kekka(targetDate) {
-    const prev = prevDate(targetDate);
-    if (!prev) return null;
-
-    // 好調騎手は前開催日の全場union(騎手は土日で場を移動するため)
-    const hotNames = rows(
-      "SELECT DISTINCT jockey FROM hot_jockeys WHERE date = ?", [prev],
-    ).map((r) => r.jockey);
-
-    const places = [];
-    for (const p of rows(
-      `SELECT DISTINCT t.place FROM reports t
-       JOIN reports y ON y.place = t.place AND y.date = ?
-       WHERE t.date = ? ORDER BY t.place`, [prev, targetDate],
-    )) {
-      const place = p.place;
-      const winBySurface = {};
-      const surfacesCombo = {};
-      for (const s of rows(
-        "SELECT * FROM surface_stats WHERE date = ? AND place = ?", [prev, place],
-      )) {
-        winBySurface[s.surface] = {
-          frame: winningEntry(rows(
-            "SELECT grp, show_rate, n FROM bias_rows WHERE date=? AND place=? AND surface=? AND kind='frame'",
-            [prev, place, s.surface])),
-          style: winningEntry(rows(
-            "SELECT grp, show_rate, n FROM bias_rows WHERE date=? AND place=? AND surface=? AND kind='style'",
-            [prev, place, s.surface])),
-        };
-        if (s.best_combo_frame) {
-          surfacesCombo[s.surface] = {
-            内外: s.best_combo_frame, 脚質: s.best_combo_style,
-            複勝率: s.best_combo_rate, 出走数: s.best_combo_n,
-          };
+    for (const m of rows(
+      `SELECT * FROM bias3_meta WHERE date = ? AND place = ?`, [date, place])) {
+      const k = m.kind === "frame3" ? "frame" : "style";
+      if (surfaces[m.surface] && surfaces[m.surface][k]) {
+        surfaces[m.surface][k].meta = m;
+      }
+    }
+    for (const s of Object.values(surfaces)) {
+      for (const holder of [s, ...Object.values(s.byDistance)]) {
+        for (const k of ["frame", "style"]) {
+          if (holder[k]) holder[k].groups.sort((a, b) => GRP_ORDER[a.grp] - GRP_ORDER[b.grp]);
         }
       }
-
-      const races = [];
-      for (const r of rows(
-        `SELECT * FROM race_top3 WHERE date = ? AND place = ?
-         ORDER BY race_no, rank, umaban`, [targetDate, place],
-      )) {
-        let race = races[races.length - 1];
-        if (!race || race.R !== r.race_no) {
-          race = { R: r.race_no, surface: r.surface, race_name: r.race_name, hits: [] };
-          races.push(race);
-        }
-        const win = winBySurface[r.surface] || { frame: null, style: null };
-        const labels = [];
-        if (win.frame && r.frame_io === win.frame)
-          labels.push(FRAME_LABEL[r.frame_io] || r.frame_io);
-        if (win.style && r.style === win.style) labels.push(r.style);
-        if (r.jockey && jockeyInHotSet(r.jockey, hotNames)) labels.push(r.jockey);
-        race.hits.push({ 着順: r.rank, 馬番: r.umaban, labels });
-      }
-
-      places.push({ place, prev_date: prev, surfaces: surfacesCombo, races });
     }
-
-    if (!places.length) return null;
-    return { date: targetDate, prev_date: prev, places };
+    const notes = rows(
+      `SELECT note FROM bias3_notes WHERE date = ? AND place = ? ORDER BY seq`,
+      [date, place]).map((r) => r.note);
+    return { surfaces, notes };
   }
 
-  function kekkaDates() {
-    // 前開催日が存在し、かつ同じ場のレポートが両日にある日だけが対象
+  // 「来てる」グループ: deviationが最も負で、閾値を超えているもの。
+  // 馬場よみのヘッドライン・結果の答え合わせ・注目レースのchipで共通に使う。
+  const DEV_THRESHOLD = 0.01;
+  const MIN_N = 8;
+
+  function favoredGroup(block) {
+    if (!block || !block.groups) return null;
+    const cands = block.groups.filter(
+      (g) => (g.n || 0) >= MIN_N && (g.deviation ?? 0) <= -DEV_THRESHOLD);
+    if (!cands.length) return null;
+    return cands.reduce((a, b) => (b.deviation < a.deviation ? b : a)).grp;
+  }
+
+  // ---- 結果検証(推奨馬の単勝的中と回収率を導出) ----
+  // pred_horses.rank(確定着順)が入っている日が検証可能。
+  // 推奨馬の的中 = rank=1(単勝ベット)。2-3着は参考情報。
+  function verifyDates() {
+    // 結果(確定着順)が入っている日 = 検証可能。全レース見送りの日も
+    // 「見送り判断の記録」として表示対象に含める。
     return rows(
-      `SELECT DISTINCT t.date FROM reports t
-       WHERE EXISTS (
-         SELECT 1 FROM reports y
-         WHERE y.place = t.place AND y.date < t.date
-           AND y.date = (SELECT MAX(date) FROM reports WHERE date < t.date)
-       )
-       ORDER BY t.date DESC`,
+      `SELECT DISTINCT date FROM pred_horses
+       WHERE rank IS NOT NULL
+       ORDER BY date DESC`,
     ).map((r) => r.date);
   }
 
+  function verify(targetDate) {
+    const places = [];
+    const total = { n_races: 0, n_reco_races: 0, n_reco: 0, n_hit: 0, payout: 0 };
+
+    for (const p of rows(
+      `SELECT DISTINCT place FROM pred_races WHERE date = ? ORDER BY place`,
+      [targetDate],
+    )) {
+      const place = p.place;
+      const sum = { n_races: 0, n_reco_races: 0, n_reco: 0, n_hit: 0, payout: 0 };
+      const races = [];
+      for (const r of rows(
+        `SELECT * FROM pred_races WHERE date = ? AND place = ? ORDER BY race_no`,
+        [targetDate, place],
+      )) {
+        sum.n_races++;
+        const race = {
+          race_no: r.race_no, race_name: r.race_name,
+          surface: r.surface, distance: r.distance,
+          verdict: r.verdict, horses: [],
+        };
+        if (r.verdict === "推奨") {
+          sum.n_reco_races++;
+          for (const h of rows(
+            `SELECT * FROM pred_horses
+             WHERE date = ? AND place = ? AND race_no = ? AND recommended = 1
+             ORDER BY ev DESC, umaban`, [targetDate, place, r.race_no],
+          )) {
+            const hit = h.rank === 1;
+            sum.n_reco++;
+            if (hit) {
+              sum.n_hit++;
+              sum.payout += h.odds || 0;
+            }
+            race.horses.push({
+              umaban: h.umaban, horse: h.horse, odds: h.odds,
+              ev: h.ev, rank: h.rank, hit,
+            });
+          }
+        }
+        races.push(race);
+      }
+      for (const k of Object.keys(total)) total[k] += sum[k];
+      places.push({ place, races, summary: sum });
+    }
+
+    if (!places.length) return null;
+    // 単勝回収率(%): 100円均等買い想定 = Σ(的中オッズ)/推奨頭数 × 100
+    total.roi = total.n_reco ? (total.payout / total.n_reco) * 100 : null;
+    for (const pl of places) {
+      pl.summary.roi = pl.summary.n_reco
+        ? (pl.summary.payout / pl.summary.n_reco) * 100 : null;
+    }
+    return { date: targetDate, places, total };
+  }
+
+  // ---- 予想(pred_*) ----
+  function predItems() {
+    return rows(
+      "SELECT DISTINCT date, place FROM pred_races ORDER BY date DESC, place ASC");
+  }
+
+  function predictions(date, place) {
+    const races = rows(
+      `SELECT * FROM pred_races WHERE date = ? AND place = ? ORDER BY race_no`,
+      [date, place]);
+    if (!races.length) return null;
+    for (const r of races) {
+      r.horses = rows(
+        `SELECT * FROM pred_horses WHERE date = ? AND place = ? AND race_no = ?
+         ORDER BY ev DESC, umaban`, [date, place, r.race_no]);
+    }
+    return races;
+  }
+
   window.SiteDB = {
-    open, indexItems, report, kekka, kekkaDates,
-    stripJockeyMark, jockeyInHotSet,
+    open, indexItems, report,
+    bias3, favoredGroup, predItems, predictions,
+    verify, verifyDates,
   };
 })();

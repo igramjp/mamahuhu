@@ -1,111 +1,170 @@
-// 馬場読み - frontend renderer
+// トラックバイアス分析 - frontend renderer(全場スクロール表示)
 const $ = (s, r = document) => r.querySelector(s);
 
 const SURFACE_META = {
   芝: { cls: "" },
   ダート: { cls: "dirt" },
 };
+const DIST_CATS = ["短距離", "マイル〜中距離", "長距離"];
 
-const pct = (v) => (v * 100).toFixed(1) + "%";
+// ---- 統計ヘルパー ----
+const DEV_MAX = 0.08; // メーター両端のスケール(正規化着順の乖離)
 
-function biasTable(rows, firstColLabel, firstColKey) {
-  if (!rows || rows.length === 0) return '<p class="muted">データなし</p>';
-  let html = `<table class="data-table bias-table"><thead><tr>
-    <th>${firstColLabel}</th><th>勝率</th><th>複勝率</th><th>頭数</th>
-  </tr></thead><tbody>`;
-  for (const r of rows) {
-    html += `<tr>
-      <td>${r[firstColKey]}</td>
-      <td>${pct(r["勝率"])}</td>
-      <td>${pct(r["複勝率"])}</td>
-      <td>${r["出走数"]}</td>
-    </tr>`;
-  }
-  return html + "</tbody></table>";
+// 有意判定: |Δ| > 1.96×SE(ベースライン既知とみなす近似・95%水準)
+function isSignificant(g) {
+  return g.se != null && Math.abs(g.deviation ?? 0) > 1.96 * g.se;
 }
 
-const FRAME_PREFIX = { 内: "内枠の", 外: "外枠の" };
+// 二項検定(両側, p=0.5)。favor_races/total_races の偏りの偶然性評価
+function binomTestP(k, n) {
+  if (!n) return null;
+  const comb = (n, k) => {
+    let r = 1;
+    for (let i = 0; i < k; i++) r = (r * (n - i)) / (i + 1);
+    return r;
+  };
+  let lo = 0, hi = 0;
+  for (let i = 0; i <= n; i++) {
+    const p = comb(n, i) * Math.pow(0.5, n);
+    if (i <= k) lo += p;
+    if (i >= k) hi += p;
+  }
+  return Math.min(1, 2 * Math.min(lo, hi));
+}
 
-function renderSurface(surface, data, place, date) {
-  const meta = SURFACE_META[surface] || { cls: "" };
-  const c = data.best_combo;
-  const comboHtml = c
-    ? `<br><span class="best-combo">最も好走した枠×脚質:<br><b>${(FRAME_PREFIX[c["内外"]] || c["内外"]) + c["脚質"]}</b><small>※集計日 ${formatDateShort(date)}</small></span>`
-    : "";
-  return `<div class="surface-block">
-    <div class="surface-header"><span class="surface-tag ${meta.cls}">${place}・${surface}</span>${comboHtml}</div>
-    <h3 class="sub-head">枠バイアス</h3>
-    ${biasTable(data.frame_bias, "区分", "内外")}
-    <h3 class="sub-head">脚質バイアス</h3>
-    ${biasTable(data.style_bias, "脚質", "脚質")}
+function fmtDelta(v) {
+  if (v == null) return "—";
+  return (v < 0 ? "−" : "+") + Math.abs(v).toFixed(3);
+}
+
+// 乖離の言語化(強度は|Δ|の区分、方向は符号)
+function devLabel(g) {
+  const dev = g.deviation ?? 0;
+  const a = Math.abs(dev);
+  if (a < 0.01) return { word: "中立", side: "flat" };
+  const strength = a < 0.03 ? "弱" : a < 0.06 ? "中" : "強";
+  return dev < 0
+    ? { word: `有利化(${strength})`, side: "plus" }
+    : { word: `不利化(${strength})`, side: "minus" };
+}
+
+// ---- 描画: 乖離メーター ----
+function devMeterRow(g) {
+  const dev = g.deviation ?? 0;
+  const adv = -dev; // 右 = ベースラインより有利
+  const w = (Math.min(Math.abs(adv), DEV_MAX) / DEV_MAX) * 50;
+  const { word, side } = devLabel(g);
+  const sig = isSignificant(g);
+  const barStyle =
+    adv >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+  return `<div class="dev-row">
+    <span class="dev-label">${g.grp}</span>
+    <div class="dev-track"><span class="dev-center"></span><span class="dev-bar ${side}" style="${barStyle}"></span></div>
+    <span class="dev-word ${side}">${word}<small class="dev-num">Δ${fmtDelta(dev)}${sig ? "<b>*</b>" : ""} n=${g.n}</small></span>
   </div>`;
 }
 
-function renderJockeys(jockeys) {
-  if (!jockeys || jockeys.length === 0)
-    return '<p class="muted">データなし</p>';
-  let html = `<table class="data-table"><thead><tr>
-    <th>騎手</th><th>最大人気差</th><th>騎乗</th><th>勝</th><th>複</th>
-  </tr></thead><tbody>`;
-  for (const j of jockeys) {
-    const v = j["最大人気差"];
-    const cls = v > 0 ? "plus" : v < 0 ? "minus" : "";
-    const sign = v > 0 ? "+" : "";
-    html += `<tr>
-      <td>${j["騎手"]}</td>
-      <td class="${cls}">${sign}${v.toFixed(0)}</td>
-      <td>${j["騎乗数"]}</td>
-      <td>${j["勝利"]}</td>
-      <td>${j["複勝"]}</td>
+// ヘッドライン: 最大|Δ|のグループの状態を文章化
+function verdictHtml(frameBlock) {
+  const cands = (frameBlock.groups || []).filter((g) => (g.n || 0) >= 8);
+  if (!cands.length) return `<p class="yomi-verdict">標本不足(n&lt;8)</p>`;
+  const top = cands.reduce((a, b) =>
+    Math.abs(b.deviation ?? 0) > Math.abs(a.deviation ?? 0) ? b : a);
+  const dev = top.deviation ?? 0;
+  if (Math.abs(dev) < 0.01) {
+    return `<p class="yomi-verdict">ベースラインからの乖離なし</p>`;
+  }
+  const dir = dev < 0 ? "有利化" : "不利化";
+  const sig = isSignificant(top) ? "有意に" : "";
+  return `<p class="yomi-verdict"><b>${top.grp}枠</b>グループが${sig}${dir}
+    <small class="yomi-verdict-stat">Δ=${fmtDelta(dev)}${isSignificant(top) ? " (p&lt;0.05)" : " (n.s.)"}</small></p>`;
+}
+
+function confidenceLine(meta) {
+  if (!meta || !meta.total_races) return "";
+  const p = binomTestP(meta.favor_races, meta.total_races);
+  return `<p class="dev-confidence">レース内比較: ${meta.total_races}R中 <b>${meta.favor_races}</b>Rで${meta.favor_label}側グループが優位(二項検定 p=${p == null ? "—" : p.toFixed(2)})</p>`;
+}
+
+// ---- 描画: 距離カテゴリ別テーブル ----
+function distTable(byDistance) {
+  const cats = DIST_CATS.filter((c) => byDistance[c]);
+  if (!cats.length) return "";
+  const cell = (holder, kind, grp) => {
+    const block = holder[kind];
+    const g = block && block.groups.find((x) => x.grp === grp);
+    if (!g) return '<td class="num-cell">—</td>';
+    const { side } = devLabel(g);
+    return `<td class="num-cell dist-${side}">${fmtDelta(g.deviation)}${isSignificant(g) ? "<b>*</b>" : ""}</td>`;
+  };
+  let rows = "";
+  for (const cat of cats) {
+    const h = byDistance[cat];
+    rows += `<tr>
+      <td class="dist-cat-cell">${cat}<small> ${h.frame && h.frame.groups[0] ? sumN(h.frame.groups) : "-"}頭</small></td>
+      ${cell(h, "frame", "内")}${cell(h, "frame", "中")}${cell(h, "frame", "外")}
+      ${cell(h, "style", "逃げ先行")}${cell(h, "style", "差し追込")}
     </tr>`;
   }
-  return html + "</tbody></table>";
+  return `<h3 class="sub-head">距離カテゴリ別の乖離Δ</h3>
+    <table class="data-table dist-table"><thead><tr>
+      <th>距離帯</th><th>内</th><th>中</th><th>外</th><th>逃先</th><th>差追</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <p class="yomi-foot-min">距離帯別は標本が小さく縮小推定が強く効くため、保守的(ベースライン寄り)な値になる。</p>`;
 }
 
-function updateComboImage(c) {
-  const img = $("#combo-image");
-  if (!img) return;
-  if (c && c["内外"] && c["脚質"]) {
-    img.src = `/images/${c["内外"]}枠${c["脚質"]}.gif?t=${Date.now()}`;
-    img.alt = `${(FRAME_PREFIX[c["内外"]] || c["内外"]) + c["脚質"]}`;
-    img.hidden = false;
-  } else {
-    img.removeAttribute("src");
-    img.alt = "";
-    img.hidden = true;
+function sumN(groups) {
+  return groups.reduce((a, g) => a + (g.n || 0), 0);
+}
+
+// ---- 描画: 1つの場×コース種別 ----
+function surfaceBlockHtml(place, surface, b3s, notes) {
+  let html = `<div class="surface-block">`;
+
+  if (b3s.frame) {
+    html += verdictHtml(b3s.frame);
+    html += `<h3 class="sub-head">枠順バイアス <small class="yomi-scale">← 不利化 ｜ ベースライン ｜ 有利化 →</small></h3>
+      <div class="dev-meter">${b3s.frame.groups.map(devMeterRow).join("")}</div>
+      ${confidenceLine(b3s.frame.meta)}`;
   }
-}
-
-function winningEntry(rows, key) {
-  if (!rows || rows.length === 0) return null;
-  return [...rows].sort(
-    (a, b) => b["複勝率"] - a["複勝率"] || b["出走数"] - a["出走数"],
-  )[0][key];
-}
-
-function stripJockeyMark(name) {
-  return (name || "").replace(/^[▲★△◇▽◎○☆▼]+/, "").trim();
-}
-
-function jockeyInHotSet(jockey, hotNames) {
-  const j = stripJockeyMark(jockey);
-  if (!j) return false;
-  for (const hn of hotNames) {
-    const hnn = stripJockeyMark(hn);
-    if (!hnn) continue;
-    if (hnn.startsWith(j) || j.startsWith(hnn)) return true;
+  if (b3s.style) {
+    html += `<h3 class="sub-head">脚質バイアス</h3>
+      <div class="dev-meter">${b3s.style.groups.map(devMeterRow).join("")}</div>
+      ${confidenceLine(b3s.style.meta)}`;
   }
-  return false;
+
+  html += distTable(b3s.byDistance || {});
+
+  const m = b3s.frame && b3s.frame.meta;
+  html += `<p class="yomi-foot">指標: 正規化着順(着順÷出走頭数)のグループ平均とレース期待値の差。
+    Δは過去2〜3年のベースライン(馬場状態×距離帯で層別${m && m.baseline_n ? `、n=${m.baseline_n.toLocaleString()}` : ""})への縮小推定後の乖離。
+    枠は馬番÷頭数による相対位置の3分位。* は近似95%水準で有意。
+    対象: ${m && m.race_count ? m.race_count : "-"}R / ${m && m.n_horses ? m.n_horses : "-"}頭。</p>`;
+
+  for (const note of notes || []) {
+    html += `<p class="yomi-note">⚠️ ${note}</p>`;
+  }
+  return html + `</div>`;
 }
 
-function notableRaceHtml(nr, surfaces, hotJockeysAllPlaces) {
+// ---- 注目レース ----
+function entryFrame3(entries) {
+  const sorted = [...entries].sort((a, b) => a["馬番"] - b["馬番"]);
+  const n = sorted.length;
+  const map = {};
+  sorted.forEach((e, i) => {
+    const p = (i + 1) / n;
+    map[e["馬番"]] = p <= 1 / 3 + 1e-9 ? "内" : p <= 2 / 3 + 1e-9 ? "中" : "外";
+  });
+  return map;
+}
+
+function notableRaceHtml(nr, bias3data) {
   if (!nr || !nr.entries || nr.entries.length === 0) return "";
-  const sData = surfaces && surfaces[nr.surface];
-  const winFrame = sData ? winningEntry(sData.frame_bias, "内外") : null;
-  const winStyle = sData ? winningEntry(sData.style_bias, "脚質") : null;
-  const hotNames = (hotJockeysAllPlaces || [])
-    .map((j) => j["騎手"])
-    .filter(Boolean);
+  const b3s = bias3data && bias3data.surfaces && bias3data.surfaces[nr.surface];
+  const favFrame = b3s ? SiteDB.favoredGroup(b3s.frame) : null;
+  const favStyle = b3s ? SiteDB.favoredGroup(b3s.style) : null;
+  const frame3Map = entryFrame3(nr.entries);
   const meta = SURFACE_META[nr.surface] || { cls: "" };
   const dateLabel = nr.date ? formatDateWithDow(nr.date) : "";
   const raceNameHtml = nr.race_name
@@ -115,14 +174,11 @@ function notableRaceHtml(nr, surfaces, hotJockeysAllPlaces) {
   let rows = "";
   for (const e of nr.entries) {
     const chips = [];
-    const frameHit = winFrame && e["内外"] === winFrame;
-    const styleHit = winStyle && e["脚質"] === winStyle;
+    const frameHit = favFrame && frame3Map[e["馬番"]] === favFrame;
+    const styleHit = favStyle && e["脚質"] === favStyle;
     if (frameHit && styleHit) {
-      chips.push(`<span class="chip chip-hit">${e["内外"]}枠</span>`);
+      chips.push(`<span class="chip chip-hit">${favFrame}枠</span>`);
       chips.push(`<span class="chip chip-hit">${e["脚質"]}</span>`);
-    }
-    if (e["騎手"] && jockeyInHotSet(e["騎手"], hotNames)) {
-      chips.push(`<span class="chip">${e["騎手"]}</span>`);
     }
     const chipsHtml =
       chips.length > 0 ? `<div class="chips">${chips.join("")}</div>` : "";
@@ -134,9 +190,9 @@ function notableRaceHtml(nr, surfaces, hotJockeysAllPlaces) {
     </tr>`;
   }
 
-  return `<section class="section" id="notable-race">
-    <h2 class="section-head">注目レース</h2>
-    <p class="section-sub">次開催のメインレース「${nr.race_name}」の出馬表。<br>直近のバイアスに当てはまる馬は？</p>
+  return `<section class="section panel notable-section">
+    <h2 class="section-head">次開催: ${nr.race_name || "メインレース"}</h2>
+    <p class="section-sub">直近推定バイアス(有利化グループ)に枠・脚質の両方が該当する出走馬をマーク。</p>
     <div class="notable-race-head">
       <span class="surface-tag ${meta.cls}">${nr.surface || ""}</span>
       ${raceNameHtml}
@@ -146,35 +202,31 @@ function notableRaceHtml(nr, surfaces, hotJockeysAllPlaces) {
   </section>`;
 }
 
-function renderReport(data, surface, place, hotJockeysAllPlaces) {
+// ---- ページ全体: 全場をスクロールで縦に並べる ----
+function renderAll(items, dataByKey, bias3ByKey) {
   const root = $("#report");
   let html = "";
 
-  const surfaces = data.surfaces || {};
-  const surfaceData = surfaces[surface];
-  updateComboImage(surfaceData && surfaceData.best_combo);
+  for (const it of items) {
+    const data = dataByKey[it.key];
+    const b3 = bias3ByKey[it.key];
+    if (!data) continue;
 
-  // バイアス
-  html += `<section class="section">
-    <h2 class="section-head">トラックバイアス</h2>
-    <p class="section-sub">直近の開催結果をもとに、<br>枠順（内1-4 / 外5-8）と脚質ごとの成績を集計。</p>`;
-  if (surfaceData) {
-    html += renderSurface(surface, surfaceData, place, data.date);
-  } else {
-    html += `<p class="muted">${surface}のレースはありませんでした。</p>`;
+    for (const surface of ["芝", "ダート"]) {
+      const b3s = b3 && b3.surfaces && b3.surfaces[surface];
+      if (!b3s) continue;
+      html += `<section class="section panel">
+        <h2 class="section-head">${it.place}・${surface}</h2>
+        ${surfaceBlockHtml(it.place, surface, b3s, b3.notes)}
+      </section>`;
+    }
+
+    html += notableRaceHtml(data.notable_race, b3);
   }
-  html += `</section>`;
 
-  // 騎手 (surface関係なく1日合算、その場の集計)
-  html += `<section class="section">
-    <h2 class="section-head">好調騎手</h2>
-    <p class="section-sub">人気差 = 人気 − 着順。<br>複勝圏内で大駆けを決めた騎手。</p>
-    ${renderJockeys(data.hot_jockeys || [])}
-  </section>`;
-
-  // 注目レース (騎手は当日全競馬場の好調騎手とマッチ)
-  html += notableRaceHtml(data.notable_race, surfaces, hotJockeysAllPlaces);
-
+  if (!html) {
+    html = '<p class="loading">この開催日の分析データはありません。</p>';
+  }
   root.innerHTML = html;
 }
 
@@ -185,7 +237,7 @@ async function init() {
     placeItems = SiteDB.indexItems();
   } catch (e) {
     $("#report").innerHTML =
-      '<p class="loading">データがまだ生成されていません。<br>GitHub Actionsの初回実行（または手動実行）後に表示されます。</p>';
+      '<p class="loading">データがまだ生成されていません。</p>';
     return;
   }
 
@@ -194,8 +246,8 @@ async function init() {
     return;
   }
 
-  // 結果(ふりかえり)が導出できる日があればCTAボタンを表示
-  if (SiteDB.kekkaDates().length > 0) {
+  // 検証可能な日があれば結果検証へのCTAを表示
+  if (SiteDB.verifyDates().length > 0) {
     const cta = $("#result-cta");
     if (cta) cta.hidden = false;
   }
@@ -203,7 +255,6 @@ async function init() {
   // ?date=YYYYMMDD で過去日指定。未指定なら最新。
   const params = new URLSearchParams(window.location.search);
   const requestedDate = params.get("date");
-
   const availableDates = [...new Set(placeItems.map((it) => it.date))]
     .sort()
     .reverse();
@@ -220,86 +271,19 @@ async function init() {
     targetDate = availableDates[0];
   }
 
-  const latestItems = placeItems.filter((it) => it.date === targetDate);
-  for (const it of latestItems) it.key = `${it.date}_${it.place}`;
-
-  // 当日全場のデータをsite.dbから組み立て。注目レースの騎手chipを当日
-  // 全競馬場の好調騎手とマッチさせるため(土曜は東京、日曜は京都など
-  // 移動するため単一場の好調騎手リストでは取りこぼす)。
+  const items = placeItems.filter((it) => it.date === targetDate);
   const dataByKey = {};
-  let hotJockeysAllPlaces = [];
-  for (const it of latestItems) {
-    const d = SiteDB.report(it.date, it.place);
-    if (!d) continue;
-    dataByKey[it.key] = d;
-    hotJockeysAllPlaces.push(...(d.hot_jockeys || []));
+  const bias3ByKey = {};
+  for (const it of items) {
+    it.key = `${it.date}_${it.place}`;
+    dataByKey[it.key] = SiteDB.report(it.date, it.place);
+    bias3ByKey[it.key] = SiteDB.bias3(it.date, it.place);
   }
 
-  // 見出し: 集計日(過去日)だと古く見えるので、当週の注目レース名を出す。
-  // 当週にG3以上のJRA重賞があればその名前、無ければ「きょう」。
-  // 重賞が複数なら格上(G1>G2>G3)を優先。
-  const gradeRank = { G1: 1, G2: 2, G3: 3 };
-  const topGraded = latestItems
-    .map((it) => ({ it, nr: (dataByKey[it.key] || {}).notable_race }))
-    .filter((x) => x.nr && x.nr.race_name && gradeRank[x.nr.grade])
-    .sort((a, b) => gradeRank[a.nr.grade] - gradeRank[b.nr.grade])[0];
-  $("#date-display").textContent = topGraded
-    ? `${topGraded.nr.race_name}のバイアスを見てみよう！`
-    : "最新のバイアスを見てみよう！";
+  $("#date-display").textContent =
+    `${formatDateWithDow(targetDate)} 開催のトラックバイアス分析`;
 
-  // 競馬場・コース選択の状態。重賞があればその開催場とコースを初期選択、
-  // 無ければ先頭の場・芝。
-  const btnContainer = $("#place-buttons");
-  const surfBtnContainer = $("#surface-buttons");
-  let currentKey = topGraded ? topGraded.it.key : latestItems[0].key;
-  let currentPlace = topGraded ? topGraded.it.place : latestItems[0].place;
-  let currentSurface = (topGraded && topGraded.nr.surface) || "芝";
-
-  function loadAndRender(key) {
-    const data = dataByKey[key];
-    if (!data) {
-      $("#report").innerHTML =
-        `<p class="loading">読み込みエラー: ${key}</p>`;
-      return;
-    }
-    renderReport(data, currentSurface, currentPlace, hotJockeysAllPlaces);
-  }
-
-  for (const it of latestItems) {
-    const btn = document.createElement("button");
-    btn.className = "place-btn";
-    btn.textContent = it.place;
-    btn.dataset.key = it.key;
-    if (it.key === currentKey) btn.classList.add("active");
-    btn.addEventListener("click", () => {
-      btnContainer
-        .querySelectorAll(".place-btn")
-        .forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentKey = it.key;
-      currentPlace = it.place;
-      loadAndRender(it.key);
-    });
-    btnContainer.appendChild(btn);
-  }
-
-  for (const s of ["芝", "ダート"]) {
-    const btn = document.createElement("button");
-    btn.className = "place-btn";
-    btn.textContent = s;
-    if (s === currentSurface) btn.classList.add("active");
-    btn.addEventListener("click", () => {
-      surfBtnContainer
-        .querySelectorAll(".place-btn")
-        .forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentSurface = s;
-      loadAndRender(currentKey);
-    });
-    surfBtnContainer.appendChild(btn);
-  }
-
-  loadAndRender(currentKey);
+  renderAll(items, dataByKey, bias3ByKey);
 }
 
 function formatDateWithDow(yyyymmdd) {
@@ -309,15 +293,6 @@ function formatDateWithDow(yyyymmdd) {
   const d = new Date(yyyy, mm - 1, dd);
   const dow = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
   return `${yyyy}/${String(mm).padStart(2, "0")}/${String(dd).padStart(2, "0")}(${dow})`;
-}
-
-function formatDateShort(yyyymmdd) {
-  const yyyy = +yyyymmdd.slice(0, 4);
-  const mm = +yyyymmdd.slice(4, 6);
-  const dd = +yyyymmdd.slice(6, 8);
-  const d = new Date(yyyy, mm - 1, dd);
-  const dow = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
-  return `${mm}/${dd}(${dow})`;
 }
 
 init();

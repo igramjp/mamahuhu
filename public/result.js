@@ -1,154 +1,143 @@
-// どうだった - frontend renderer
+// 結果検証 - frontend renderer
+// 推奨馬(単勝)の的中と回収率を検証する。見送りレースは見送りとして記録。
 const $ = (s, r = document) => r.querySelector(s);
+
+const SURFACE_META = {
+  芝: { cls: "" },
+  ダート: { cls: "dirt" },
+};
 
 function formatDateShort(yyyymmdd) {
   const yyyy = +yyyymmdd.slice(0, 4);
   const mm = +yyyymmdd.slice(4, 6);
   const dd = +yyyymmdd.slice(6, 8);
   const d = new Date(yyyy, mm - 1, dd);
-  const dow = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+  const dow = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
   return `${mm}/${dd}(${dow})`;
 }
 
-const SURFACE_META = {
-  "芝": { cls: "" },
-  "ダート": { cls: "dirt" },
-};
-const FRAME_PREFIX = { "内": "内枠の", "外": "外枠の" };
-
-function placeAnchorId(place) {
-  return `place-${encodeURIComponent(place)}`;
+function fmtRoi(roi) {
+  return roi == null ? "—" : Math.round(roi) + "%";
 }
 
-function renderSurfaceHeader(place, surface, c, prevDate) {
-  const meta = SURFACE_META[surface] || { cls: "" };
-  const combo = (FRAME_PREFIX[c["内外"]] || c["内外"]) + c["脚質"];
-  return `<div class="surface-header">
-    <span class="surface-tag ${meta.cls}">${surface}</span>
-    <br><span class="best-combo">最も好走した枠×脚質:<br><b>${combo}</b><small>※集計日 ${formatDateShort(prevDate)}</small></span>
+function outcomeChip(h) {
+  if (h.hit) return `<span class="chip chip-hit">1着 的中</span>`;
+  if (h.rank === 2 || h.rank === 3)
+    return `<span class="chip">${h.rank}着</span>`;
+  return `<span class="chip chip-miss">4着以下</span>`;
+}
+
+function horseRow(h) {
+  return `<tr class="${h.hit ? "verify-hit-row" : ""}">
+    <td class="horse-num-cell"><span class="horse-num">${h.umaban}</span></td>
+    <td class="horse-name-cell">${h.horse || ""}</td>
+    <td class="num-cell">${h.odds ?? "—"}</td>
+    <td class="num-cell">${h.ev != null ? h.ev.toFixed(2) : "—"}</td>
+    <td class="verify-outcome-cell">${outcomeChip(h)}</td>
+  </tr>`;
+}
+
+function raceRow(r) {
+  const meta = SURFACE_META[r.surface] || { cls: "" };
+  const head = `<div class="pred-race-head">
+      <span class="race-no-tag">${r.race_no}R</span>
+      <span class="pred-race-name">${r.race_name || ""}</span>
+      <span class="surface-tag-mini ${meta.cls}">${r.surface}${r.distance || ""}m</span>
+      ${r.verdict === "推奨"
+        ? '<span class="verdict-chip verdict-reco">推奨</span>'
+        : '<span class="verdict-chip verdict-pass">見送り</span>'}
+    </div>`;
+
+  if (r.verdict !== "推奨") {
+    return `<div class="pred-race verify-pass-race">${head}</div>`;
+  }
+
+  const table = `<table class="data-table pred-table"><thead><tr>
+      <th>馬番</th><th>馬名</th><th>単勝オッズ</th><th>期待値</th><th>結果</th>
+    </tr></thead><tbody>${r.horses.map(horseRow).join("")}</tbody></table>`;
+  return `<div class="pred-race pred-race-open">${head}${table}</div>`;
+}
+
+function summaryHtml(s, label) {
+  return `<div class="verify-summary">
+    <div class="verify-stat"><span class="verify-stat-num">${s.n_races}</span><span class="verify-stat-label">対象R</span></div>
+    <div class="verify-stat"><span class="verify-stat-num">${s.n_reco_races}</span><span class="verify-stat-label">推奨R</span></div>
+    <div class="verify-stat"><span class="verify-stat-num">${s.n_hit}<small>/${s.n_reco}</small></span><span class="verify-stat-label">的中/推奨頭数</span></div>
+    <div class="verify-stat"><span class="verify-stat-num ${s.roi != null && s.roi >= 100 ? "roi-plus" : ""}">${fmtRoi(s.roi)}</span><span class="verify-stat-label">単勝回収率</span></div>
   </div>`;
 }
 
-function renderHeadlines(place, surfaces, prevDate) {
-  if (!surfaces || Object.keys(surfaces).length === 0) {
-    return '<p class="result-headline">直近の開催データなし。</p>';
-  }
-  let html = '';
-  for (const surface of ['芝', 'ダート']) {
-    const c = surfaces[surface];
-    if (!c) continue;
-    html += renderSurfaceHeader(place, surface, c, prevDate);
-  }
-  return html;
-}
-
-function renderPlace(p) {
-  const headlines = renderHeadlines(p.place, p.surfaces, p.prev_date);
-
-  let rows = '';
-  for (const race of p.races) {
-    const bias = p.surfaces && p.surfaces[race.surface];
-    const frameLabel = bias ? bias["内外"] + "枠" : null;
-    const styleLabel = bias ? bias["脚質"] : null;
-    const hitByRank = {};
-    for (const h of (race.hits || [])) hitByRank[h["着順"]] = h;
-    for (const rank of [1, 2, 3]) {
-      const raceNameHtml = (rank === 1 && race.race_name)
-        ? `<span class="race-name">${race.race_name}</span>`
-        : '';
-      const rcell = rank === 1
-        ? `<td class="race-cell" rowspan="3">${raceNameHtml}<span class="race-no">${race.R}R</span><small> ${race.surface}</small></td>`
-        : '';
-      const h = hitByRank[rank];
-      const numEl = h && h["馬番"] != null ? `<span class="horse-num">${h["馬番"]}</span>` : '';
-      let labelChips;
-      if (!h || !h.labels || h.labels.length === 0) {
-        labelChips = '<span class="chip chip-miss">該当なし</span>';
-      } else {
-        const isComboHit = frameLabel && styleLabel
-          && h.labels.includes(frameLabel) && h.labels.includes(styleLabel);
-        labelChips = h.labels.map(l => {
-          const hit = isComboHit && (l === frameLabel || l === styleLabel);
-          return `<span class="chip${hit ? ' chip-hit' : ''}">${l}</span>`;
-        }).join('');
-      }
-      rows += `<tr>${rcell}<td class="result-cell"><div class="chips">${numEl}${labelChips}</div></td><td class="rank-cell">${rank}</td></tr>`;
-    }
-  }
-
-  return `<section class="section" id="${placeAnchorId(p.place)}">
-    <h2 class="section-head">${p.place}</h2>
-    ${headlines}
-    <table class="data-table result-table"><thead><tr>
-      <th>レース</th><th>結果</th><th>着順</th>
-    </tr></thead><tbody>${rows}</tbody></table>
+function renderVerify(data) {
+  const root = $("#report");
+  let html = `<section class="section panel">
+    <h2 class="section-head">検証サマリ</h2>
+    <p class="section-sub">推奨馬を単勝100円で均等買いした場合の検証。<br>見送りレースは賭けていないため回収率に影響しません。</p>
+    ${summaryHtml(data.total)}
   </section>`;
-}
 
-function renderPlaceButtons(places) {
-  const container = $('#place-buttons');
-  if (!container) return;
-  container.innerHTML = '';
-  for (const p of places) {
-    const a = document.createElement('a');
-    a.className = 'place-btn';
-    a.textContent = p.place;
-    a.href = `#${placeAnchorId(p.place)}`;
-    container.appendChild(a);
+  for (const pl of data.places) {
+    html += `<section class="section panel">
+      <h2 class="section-head">${pl.place}</h2>
+      ${summaryHtml(pl.summary)}
+      ${pl.races.map(raceRow).join("")}
+    </section>`;
   }
-}
 
-function renderResult(data) {
-  const root = $('#report');
-  if (!data.places || data.places.length === 0) {
-    root.innerHTML = '<p class="loading">対象の場がありません。</p>';
-    return;
-  }
-  root.innerHTML = data.places.map(renderPlace).join('');
-  renderPlaceButtons(data.places);
+  html += `<section class="section">
+    <h2 class="section-head">読み方</h2>
+    <p class="yomi-foot">的中 = 推奨馬の1着(単勝)。回収率 = Σ(的中馬のオッズ)÷推奨頭数×100。
+    1開催日の回収率は分散が大きく、単日の結果でモデルの優劣は判断できません。
+    評価は長期のROIとキャリブレーションで行います(分析手法参照)。</p>
+    <p class="yomi-note">⚠️ 本検証は過去の推奨の記録であり、将来の成績を保証しません。</p>
+  </section>`;
+
+  root.innerHTML = html;
 }
 
 async function init() {
-  let kekkaDates;
+  let dates;
   try {
     await SiteDB.open();
-    kekkaDates = SiteDB.kekkaDates(); // 新しい順
+    dates = SiteDB.verifyDates(); // 新しい順
   } catch (e) {
-    $('#report').innerHTML = '<p class="loading">データがまだ生成されていません。</p>';
+    $("#report").innerHTML = '<p class="loading">データがまだ生成されていません。</p>';
     return;
   }
 
-  if (kekkaDates.length === 0) {
-    $('#report').innerHTML = '<p class="loading">結果データはまだありません。<br>2日連続で開催されると、ふりかえりが出ます。</p>';
+  if (dates.length === 0) {
+    $("#report").innerHTML =
+      '<p class="loading">検証可能なデータはまだありません。<br>推奨とレース結果が揃うと表示されます。</p>';
     return;
   }
 
-  const cta = $('#index-cta');
+  const cta = $("#index-cta");
   if (cta) cta.hidden = false;
 
   // ?date=YYYYMMDD で過去日指定。未指定なら最新。
   const params = new URLSearchParams(window.location.search);
-  const requestedDate = params.get('date');
+  const requestedDate = params.get("date");
   let targetDate;
   if (requestedDate) {
-    if (!kekkaDates.includes(requestedDate)) {
-      $('#report').innerHTML = `<p class="loading">${requestedDate} の結果データはありません。</p>`;
+    if (!dates.includes(requestedDate)) {
+      $("#report").innerHTML =
+        `<p class="loading">${requestedDate} の検証データはありません。</p>`;
       return;
     }
     targetDate = requestedDate;
   } else {
-    targetDate = kekkaDates[0];
+    targetDate = dates[0];
   }
 
-  const ledeDate = $('#lede-date');
+  const ledeDate = $("#lede-date");
   if (ledeDate) ledeDate.textContent = formatDateShort(targetDate);
 
-  const data = SiteDB.kekka(targetDate);
+  const data = SiteDB.verify(targetDate);
   if (!data) {
-    $('#report').innerHTML = `<p class="loading">${targetDate} の結果データはありません。</p>`;
+    $("#report").innerHTML =
+      `<p class="loading">${targetDate} の検証データはありません。</p>`;
     return;
   }
-  renderResult(data);
+  renderVerify(data);
 }
 
 init();

@@ -192,7 +192,8 @@ def _extract_grade(name_tag):
 
 def fetch_main_race_entries(race_id):
     """11R(注目レース)の出馬表を shutuba_past.html から全頭抽出。
-    {race_name, grade, surface, entries:[{枠,馬番,馬名,騎手,内外,脚質}]} を返す。
+    {race_name, grade, surface, entries:[{枠,馬番,馬名,騎手,脚質}]} を返す。
+    相対枠位置(内/中/外)は頭数から機械的に決まるため表示側で計算する。
     grade は G1/G2/G3 か None。脚質は各馬の前走通過順から推定
     (直近5走の総合ラベルではない)。取れない(出馬表未公開等)場合は None。"""
     url = f"https://race.netkeiba.com/race/shutuba_past.html?race_id={race_id}&rf=shutuba_submenu"
@@ -226,7 +227,6 @@ def fetch_main_race_entries(race_id):
             "馬番": umaban,
             "馬名": horse_name,
             "騎手": jockey,
-            "内外": "内" if waku <= 4 else "外",
             "脚質": style,
         })
 
@@ -445,8 +445,7 @@ def analyze_to_dict(df, place, yyyymmdd, source="db"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["上り"] = pd.to_numeric(df["上り"], errors="coerce")
     df = df.dropna(subset=["着順", "枠番", "人気"])
-    # 騎手の評価記号(▲★△等)を集計前に剥がす。realtimeソースだと同一騎手が
-    # 減量印付き/無しで2行に分裂し hot_jockeys が別エントリで二重計上される。
+    # 騎手の評価記号(▲★△等)を剥がして表記を正規化する(top3表示用)。
     if "騎手" in df.columns:
         df["騎手"] = df["騎手"].apply(
             lambda x: _normalize_jockey_name(x) if pd.notna(x) else x
@@ -459,105 +458,10 @@ def analyze_to_dict(df, place, yyyymmdd, source="db"):
         df["脚質"] = df["脚質_前走"]
     else:
         df["脚質"] = df.apply(lambda r: derive_style(r["通過"], r["頭数"]), axis=1)
-    df["内外"] = df["枠番"].apply(lambda x: "内" if x <= 4 else "外")
-
-    def bias_rows(sub, key, labels):
-        out = []
-        for label in labels:
-            grp = sub[sub[key] == label]
-            if grp.empty:
-                continue
-            out.append({
-                key: label,
-                "勝率": round(float((grp["着順"] == 1).mean()), 3),
-                "複勝率": round(float((grp["着順"] <= 3).mean()), 3),
-                "出走数": int(len(grp)),
-            })
-        return out
-
-    def combo_matrix(sub):
-        sub2 = sub.dropna(subset=["脚質"])
-        if sub2.empty:
-            return []
-        grp = (
-            sub2.groupby(["内外", "脚質"])
-            .agg(n=("着順", "count"),
-                 rate=("着順", lambda x: float((x <= 3).mean())))
-            .reset_index()
-        )
-        return [
-            {
-                "内外": str(row["内外"]),
-                "脚質": str(row["脚質"]),
-                "複勝率": round(float(row["rate"]), 3),
-                "出走数": int(row["n"]),
-            }
-            for _, row in grp.iterrows()
-        ]
-
-    def best_combo(sub, frame_bias, style_bias, min_n=3):
-        # 4マス直接最大化はセルあたりn<25で分散が大きく、1頭分の差でブレる。
-        # 周辺(内外/脚質)はnが倍以上あって安定するので、各次元で最大を選び
-        # その組合せの実セルの率を返す。詳細な4マスは combo_matrix に残す。
-        sub2 = sub.dropna(subset=["脚質"])
-        if sub2.empty or not frame_bias or not style_bias:
-            return None
-        best_frame = max(frame_bias, key=lambda x: (x["複勝率"], x["出走数"]))
-        best_style = max(style_bias, key=lambda x: (x["複勝率"], x["出走数"]))
-        cell = sub2[(sub2["内外"] == best_frame["内外"]) & (sub2["脚質"] == best_style["脚質"])]
-        if len(cell) < min_n:
-            return None
-        return {
-            "内外": str(best_frame["内外"]),
-            "脚質": str(best_style["脚質"]),
-            "複勝率": round(float((cell["着順"] <= 3).mean()), 3),
-            "出走数": int(len(cell)),
-        }
-
-    df["人気差"] = df["人気"] - df["着順"]
-
-    def hot_jockeys_for(sub):
-        if sub.empty:
-            return []
-        sub = sub.copy()
-        # 複勝圏内(1-3着)のときだけ人気差を残す
-        sub["人気差_複勝"] = sub["人気差"].where(sub["着順"] <= 3)
-        jockey = sub.groupby("騎手").agg(
-            最大人気差=("人気差_複勝", "max"),
-            騎乗数=("着順", "count"),
-            勝利=("着順", lambda x: int((x == 1).sum())),
-            複勝=("着順", lambda x: int((x <= 3).sum())),
-        )
-        # 複勝圏内で人気差+5以上のサプライズを記録した騎手
-        jockey = jockey[jockey["最大人気差"] >= 5]
-        jockey = jockey.sort_values("最大人気差", ascending=False)
-        return [
-            {
-                "騎手": str(name),
-                "最大人気差": float(row["最大人気差"]),
-                "騎乗数": int(row["騎乗数"]),
-                "勝利": int(row["勝利"]),
-                "複勝": int(row["複勝"]),
-            }
-            for name, row in jockey.iterrows()
-        ]
-
-    surfaces = {}
-    for surface in ["芝", "ダート"]:
-        sub = df[df["コース"] == surface]
-        n_races = sub["race_id"].nunique()
-        if n_races == 0:
-            continue
-
-        fb = bias_rows(sub, "内外", ["内", "外"])
-        sb = bias_rows(sub, "脚質", ["逃げ先行", "差し追込"])
-        surfaces[surface] = {
-            "race_count": int(n_races),
-            "frame_bias": fb,
-            "style_bias": sb,
-            "best_combo": best_combo(sub, fb, sb),
-            "combo_matrix": combo_matrix(sub),
-        }
+    # 相対枠位置3分割(bias.pyと同じ定義): 出走馬の中での馬番順位÷頭数
+    rel = df.groupby("race_id")["馬番"].rank(method="first") / df["頭数"]
+    df["枠3"] = rel.map(
+        lambda p: "内" if p <= 1 / 3 + 1e-9 else ("中" if p <= 2 / 3 + 1e-9 else "外"))
 
     return {
         "place": place,
@@ -565,14 +469,12 @@ def analyze_to_dict(df, place, yyyymmdd, source="db"):
         "source": source,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "total_races": int(df["race_id"].nunique()),
-        "surfaces": surfaces,
-        "hot_jockeys": hot_jockeys_for(df),
         "races": per_race_top3(df),
     }
 
 
 def per_race_top3(df):
-    """各レースの上位3頭の属性(着順/内外/脚質/騎手)を抽出。
+    """各レースの上位3頭の属性(着順/枠3/脚質/騎手)を抽出。
     結果ページの前日バイアス照合に使う。"""
     races = []
     for rid, group in df.groupby("race_id"):
@@ -589,7 +491,7 @@ def per_race_top3(df):
             top3_data.append({
                 "着順": int(row["着順"]),
                 "馬番": int(row["馬番"]) if pd.notna(row["馬番"]) else None,
-                "内外": str(row["内外"]) if pd.notna(row["内外"]) else None,
+                "枠3": str(row["枠3"]) if pd.notna(row["枠3"]) else None,
                 "脚質": str(row["脚質"]) if pd.notna(row["脚質"]) else None,
                 "騎手": str(row["騎手"]) if pd.notna(row["騎手"]) else None,
             })
