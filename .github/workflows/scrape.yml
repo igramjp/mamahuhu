@@ -60,6 +60,10 @@ jobs:
           TARGET_DATE=$(TZ=Asia/Tokyo date +%Y%m%d)
           python scraper/scrape.py "$TARGET_DATE"
           python scraper/rebuild_site.py --from "$TARGET_DATE"
+          # 翌日の前日オッズスナップショット(土曜夕方→日曜ぶん)。
+          # 20時の前日ポストが注目馬の実名を載せるのに使う。失敗しても継続。
+          TOMORROW=$(TZ=Asia/Tokyo date -d tomorrow +%Y%m%d)
+          python scraper/odds.py --date "$TOMORROW" || echo "前日オッズ取得失敗(継続)"
 
       - name: Run scraper (db rebuild, manual)
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'rebuild'
@@ -78,6 +82,9 @@ jobs:
           # 直近開催日(=前週日曜)の各場データについて、翌日(土)の出馬表が
           # 公開されていれば notable_race を埋め直す。全レース再scrape はしない。
           python scraper/scrape.py --notable-only
+          # 翌日(土曜)の前日オッズスナップショット。金曜20時の前日ポストが使う。
+          TOMORROW=$(TZ=Asia/Tokyo date -d tomorrow +%Y%m%d)
+          python scraper/odds.py --date "$TOMORROW" || echo "前日オッズ取得失敗(継続)"
 
       - name: Backfill raw data into keiba.db (Tuesday)
         if: github.event.schedule == '0 9 * * TUE' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'rawdb')

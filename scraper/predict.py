@@ -41,6 +41,80 @@ def _prev_kaisai_date(conn, place, target_date):
     return row[0] if row else None
 
 
+def _load_deviations(conn, place, target_date):
+    """前開催日の枠バイアス deviation を {surface: {grp: dev}} で返す
+    (リーク防止: target_date 当日の結果は使わない)。"""
+    prev_date = _prev_kaisai_date(conn, place, target_date)
+    bias_report = build_bias_report(conn, place, prev_date) if prev_date else None
+    deviations = {}
+    if bias_report:
+        for surface, s in bias_report["surfaces"].items():
+            fb = s.get("frame_bias")
+            if fb:
+                deviations[surface] = {
+                    g["group"]: (g.get("deviation") or 0.0) for g in fb["groups"]}
+    return deviations
+
+
+def _pack_race(sub, dev, race_no, race_name, surface, distance):
+    """1レース分の予想dictを作る共通処理。
+    sub: umaban, odds, frame3, horse, jockey, finish 列を持つDataFrame。"""
+    sub = sub.copy()
+
+    # 1. 市場確率: 1/オッズ をレース内正規化
+    inv = 1.0 / sub["odds"]
+    sub["market_prob"] = inv / inv.sum()
+
+    # 2. 補正: 枠グループの deviation(負=いつもより有利)を log 確率に加点
+    sub["adj"] = sub["frame3"].map(lambda g: -BETA * dev.get(g, 0.0))
+    logit = sub["market_prob"].map(math.log) + sub["adj"]
+    w = logit.map(math.exp)
+    sub["model_prob"] = w / w.sum()
+
+    # 3. 期待値と買い目。市場確率はレース内正規化で控除率を除いているため、
+    #    モデル=市場のときの期待値は約0.8(=控除率ぶん)に落ち着く。
+    #    1.1を超えるのは補正が市場と大きく食い違う馬だけで、それが正常。
+    sub["ev"] = sub["model_prob"] * sub["odds"]
+    sub["recommended"] = sub["ev"] >= EV_THRESHOLD
+    # 注目馬: 市場比の評価上乗せ(edge)が敷居以上のレースで、
+    # 最上位(edge同率ならモデル確率最大=有利グループ内の最上位人気)1頭
+    sub["edge"] = sub["model_prob"] / sub["market_prob"] - 1.0
+
+    attention_umaban = None
+    if float(sub["edge"].max()) >= ATTENTION_FLOOR:
+        top = sub[sub["edge"] >= sub["edge"].max() - 1e-9]
+        attention_umaban = int(top.loc[top["model_prob"].idxmax(), "umaban"])
+
+    horses = [{
+        "umaban": int(r.umaban),
+        "horse": r.horse if isinstance(r.horse, str) else None,
+        "jockey": r.jockey if isinstance(r.jockey, str) else None,
+        "odds": round(float(r.odds), 1),
+        "market_prob": round(float(r.market_prob), 4),
+        "model_prob": round(float(r.model_prob), 4),
+        "ev": round(float(r.ev), 3),
+        "edge": round(float(r.edge), 4),
+        "recommended": bool(r.recommended),
+        "attention": int(r.umaban) == attention_umaban,
+        "rank": int(r.finish) if pd.notna(r.finish) else None,
+    } for r in sub.itertuples()]
+
+    n_reco = sum(1 for h in horses if h["recommended"])
+    horses.sort(key=lambda h: (-h["edge"], -h["model_prob"]))
+    # site.dbのサイズ抑制: 表示に使う行(推奨馬・注目馬 + 上位3頭)だけ保存
+    horses = [h for i, h in enumerate(horses)
+              if h["recommended"] or h["attention"] or i < 3]
+    return {
+        "race_no": race_no,
+        "race_name": race_name,
+        "surface": surface,
+        "distance": int(distance) if distance is not None else None,
+        "verdict": "推奨" if n_reco else "見送り",
+        "model_version": MODEL_VERSION,
+        "horses": horses,
+    }
+
+
 def build_predictions(conn, place, target_date=None):
     """target_date のレースに対する予想リストを返す。
     バイアスは「その日の朝に計算できた値」= 前開催日のレポートを使う
@@ -50,15 +124,7 @@ def build_predictions(conn, place, target_date=None):
         if target_date is None:
             return None, None
 
-    prev_date = _prev_kaisai_date(conn, place, target_date)
-    bias_report = build_bias_report(conn, place, prev_date) if prev_date else None
-    deviations = {}   # {surface: {grp: deviation}}
-    if bias_report:
-        for surface, s in bias_report["surfaces"].items():
-            fb = s.get("frame_bias")
-            if fb:
-                deviations[surface] = {
-                    g["group"]: (g.get("deviation") or 0.0) for g in fb["groups"]}
+    deviations = _load_deviations(conn, place, target_date)
 
     day = load_horses(conn, place=place, date_eq=target_date)
     if day.empty:
@@ -76,69 +142,57 @@ def build_predictions(conn, place, target_date=None):
             continue
         sub["odds"] = sub["umaban"].map(odds_map)
 
-        # 1. 市場確率: 1/オッズ をレース内正規化
-        inv = 1.0 / sub["odds"]
-        sub["market_prob"] = inv / inv.sum()
-
-        # 2. 補正: 枠グループの deviation(負=いつもより有利)を log 確率に加点
-        dev = deviations.get(meta["surface"], {})
-        sub["adj"] = sub["frame3"].map(lambda g: -BETA * dev.get(g, 0.0))
-        logit = sub["market_prob"].map(math.log) + sub["adj"]
-        w = logit.map(math.exp)
-        sub["model_prob"] = w / w.sum()
-
-        # 3. 期待値と買い目。市場確率はレース内正規化で控除率を除いているため、
-        #    モデル=市場のときの期待値は約0.8(=控除率ぶん)に落ち着く。
-        #    1.1を超えるのは補正が市場と大きく食い違う馬だけで、それが正常。
-        sub["ev"] = sub["model_prob"] * sub["odds"]
-        sub["recommended"] = sub["ev"] >= EV_THRESHOLD
-        # 注目馬: 市場比の評価上乗せ(edge)が敷居以上のレースで、
-        # 最上位(edge同率ならモデル確率最大=有利グループ内の最上位人気)1頭
-        sub["edge"] = sub["model_prob"] / sub["market_prob"] - 1.0
-
-        attention_umaban = None
-        if float(sub["edge"].max()) >= ATTENTION_FLOOR:
-            top = sub[sub["edge"] >= sub["edge"].max() - 1e-9]
-            attention_umaban = int(top.loc[top["model_prob"].idxmax(), "umaban"])
-
-        horses = [{
-            "umaban": int(r.umaban),
-            "horse": None,
-            "jockey": None,
-            "odds": round(float(r.odds), 1),
-            "market_prob": round(float(r.market_prob), 4),
-            "model_prob": round(float(r.model_prob), 4),
-            "ev": round(float(r.ev), 3),
-            "edge": round(float(r.edge), 4),
-            "recommended": bool(r.recommended),
-            "attention": int(r.umaban) == attention_umaban,
-            "rank": int(r.finish) if pd.notna(r.finish) else None,
-        } for r in sub.itertuples()]
-        # 馬名・騎手を補完
+        # 馬名・騎手を結合
         names = dict(conn.execute(
             "SELECT umaban, horse || '|' || COALESCE(jockey,'') FROM results"
             " WHERE race_id = ?", (rid,)))
-        for h in horses:
-            if h["umaban"] in names:
-                nm, jk = names[h["umaban"]].split("|", 1)
-                h["horse"], h["jockey"] = nm, jk or None
+        sub["horse"] = sub["umaban"].map(
+            lambda u: names[u].split("|", 1)[0] if u in names else None)
+        sub["jockey"] = sub["umaban"].map(
+            lambda u: (names[u].split("|", 1)[1] or None) if u in names else None)
 
-        n_reco = sum(1 for h in horses if h["recommended"])
-        horses.sort(key=lambda h: (-h["edge"], -h["model_prob"]))
-        # site.dbのサイズ抑制: 表示に使う行(推奨馬・注目馬 + 上位3頭)だけ保存
-        horses = [h for i, h in enumerate(horses)
-                  if h["recommended"] or h["attention"] or i < 3]
-        races.append({
-            "race_no": int(str(rid)[-2:]),
-            "race_name": conn.execute(
-                "SELECT race_name FROM races WHERE race_id = ?", (rid,)
-            ).fetchone()[0],
-            "surface": meta["surface"],
-            "distance": int(meta["distance"]),
-            "verdict": "推奨" if n_reco else "見送り",
-            "model_version": MODEL_VERSION,
-            "horses": horses,
-        })
+        race_name = conn.execute(
+            "SELECT race_name FROM races WHERE race_id = ?", (rid,)).fetchone()[0]
+        races.append(_pack_race(
+            sub, deviations.get(meta["surface"], {}),
+            int(str(rid)[-2:]), race_name, meta["surface"], meta["distance"]))
+
+    races.sort(key=lambda r: r["race_no"])
+    return target_date, races
+
+
+def build_forward_predictions(conn, place, target_date):
+    """順方向の予想: odds.py が保存した前日スナップショット
+    (forward_races/forward_entries)から、まだ走っていないレースの
+    EV・注目馬を計算する。オッズは前日(前売り)時点のもの。
+    データが無ければ (None, None)。"""
+    rows = conn.execute(
+        "SELECT race_id, race_no, race_name, surface, distance"
+        " FROM forward_races WHERE date = ? AND place = ?"
+        " AND surface IN ('芝','ダート') ORDER BY race_no",
+        (target_date, place)).fetchall()
+    if not rows:
+        return None, None
+
+    deviations = _load_deviations(conn, place, target_date)
+
+    races = []
+    for rid, race_no, race_name, surface, distance in rows:
+        sub = pd.read_sql_query(
+            "SELECT umaban, horse, jockey, win_odds AS odds"
+            " FROM forward_entries WHERE race_id = ?"
+            " AND win_odds IS NOT NULL", conn, params=[rid])
+        if len(sub) < 5:
+            continue
+        # 相対枠位置3分割(bias.py/backtest.pyと同じ定義)
+        rel = sub["umaban"].rank(method="first") / len(sub)
+        sub["frame3"] = rel.map(
+            lambda p: "内" if p <= 1 / 3 + 1e-9
+            else ("中" if p <= 2 / 3 + 1e-9 else "外"))
+        sub["finish"] = None
+        races.append(_pack_race(
+            sub, deviations.get(surface, {}),
+            race_no, race_name, surface, distance))
 
     races.sort(key=lambda r: r["race_no"])
     return target_date, races
@@ -150,10 +204,20 @@ def main():
     ap.add_argument("--date", default=None)
     ap.add_argument("--db", dest="db_path", default=None)
     ap.add_argument("--export", action="store_true", help="site.dbへ書き込む")
+    ap.add_argument("--forward", action="store_true",
+                    help="前日スナップショット(odds.py)から順方向に予想する")
     args = ap.parse_args()
 
     conn = db.connect(args.db_path)
-    date, races = build_predictions(conn, args.place, args.date)
+    if args.forward:
+        if not args.date:
+            ap.error("--forward には --date が必要です")
+        if args.export:
+            ap.error("--forward の site.db 書き込みは未対応"
+                     "(未確定レースのUI表示が未検証)")
+        date, races = build_forward_predictions(conn, args.place, args.date)
+    else:
+        date, races = build_predictions(conn, args.place, args.date)
     if not races:
         print(f"{args.place} の予想対象データがありません")
         return

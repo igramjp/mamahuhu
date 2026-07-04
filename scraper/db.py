@@ -67,8 +67,36 @@ CREATE TABLE IF NOT EXISTS failures (
     failed_at TEXT
 );
 
+-- 前日オッズスナップショット(odds.py)。翌日出走レースの出馬表+前売り単勝。
+-- 順方向の期待値計算(predict.py --forward)・X前日ポストの注目馬実名表示・
+-- 前日vs確定オッズ(スマートマネー)研究の材料。結果はresultsに入るため、
+-- forward_entries.win_odds と results.win_odds の突合で変動が分析できる。
+CREATE TABLE IF NOT EXISTS forward_races (
+    race_id    TEXT PRIMARY KEY,
+    date       TEXT NOT NULL,
+    place      TEXT NOT NULL,
+    race_no    INTEGER,
+    race_name  TEXT,
+    surface    TEXT,               -- 芝/ダート/障害
+    distance   INTEGER,
+    snapped_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS forward_entries (
+    race_id    TEXT NOT NULL,
+    umaban     INTEGER NOT NULL,
+    wakuban    INTEGER,
+    horse      TEXT,
+    jockey     TEXT,
+    win_odds   REAL,               -- スナップショット時点の単勝(発売前はNULL)
+    popularity INTEGER,
+    snapped_at TEXT NOT NULL,
+    PRIMARY KEY (race_id, umaban)
+);
+
 CREATE INDEX IF NOT EXISTS idx_races_date  ON races(date);
 CREATE INDEX IF NOT EXISTS idx_races_place ON races(place, date);
+CREATE INDEX IF NOT EXISTS idx_fwd_races_date ON forward_races(date);
 """
 
 RACE_COLS = [
@@ -116,6 +144,22 @@ def upsert_race(conn, race, results):
         for r in results:
             _upsert(conn, "results", RESULT_COLS, r)
         conn.execute("DELETE FROM failures WHERE race_id = ?", (race["race_id"],))
+
+
+FWD_RACE_COLS = ["race_id", "date", "place", "race_no", "race_name",
+                 "surface", "distance", "snapped_at"]
+FWD_ENTRY_COLS = ["race_id", "umaban", "wakuban", "horse", "jockey",
+                  "win_odds", "popularity", "snapped_at"]
+
+
+def upsert_forward(conn, race, entries):
+    """前日スナップショット1レース分をUPSERT(再実行で最新に置き換え)。"""
+    with conn:
+        _upsert(conn, "forward_races", FWD_RACE_COLS, race)
+        conn.execute("DELETE FROM forward_entries WHERE race_id = ?",
+                     (race["race_id"],))
+        for e in entries:
+            _upsert(conn, "forward_entries", FWD_ENTRY_COLS, e)
 
 
 def record_failure(conn, race_id, date, error):

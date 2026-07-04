@@ -3,10 +3,10 @@ mamahuhu X auto-poster
 
 ■ 前日ポスト(金・土 20:00 JST)
   翌日のG3以上レースについて期待値分析の結論を投稿する。
-  v1モデルは β が小さく、オッズに依らず期待値の上界が閾値未満のため
-  「見送り」を前日にリークなしで宣言できる(run_preview 内の上界判定)。
-  上界が閾値を超えるモデルに更新された場合は投稿をスキップして警告する
-  (前日オッズ取得パイプラインの実装が必要になったシグナル)。
+  scraper/odds.py が18時に保存した前日オッズスナップショット(keiba.dbの
+  forward_*)があれば、順方向の実EVで結論を出し注目馬の実名も載せる。
+  スナップショットが無い場合は従来どおり、オッズに依らない期待値上界の
+  判定で「見送り」をリークなしで宣言する(上界が閾値以上ならスキップ+警告)。
 
 ■ 結果検証ポスト(火 20:00 JST, --verify)
   直近週末の判断(見送り/推奨)と検証(的中・回収率・全馬ベット基準)を投稿。
@@ -37,7 +37,8 @@ from bs4 import BeautifulSoup
 
 # モデルパラメータは scraper/predict.py を単一の真実として参照する
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scraper"))
-from predict import BETA, EV_THRESHOLD, MODEL_VERSION  # noqa: E402
+from predict import (BETA, EV_THRESHOLD, MODEL_VERSION,  # noqa: E402
+                     build_forward_predictions)
 
 # ---------- 定数 ----------
 JST = timezone(timedelta(hours=9))
@@ -139,6 +140,32 @@ def ev_upper_bound(max_x: float) -> float:
     市場確率×オッズ ≦ 1/オーバーラウンド下限、モデル補正は e^(β·x) 倍まで。
     この値が閾値未満なら、どんなオッズでも推奨は発生しない=見送り確定。"""
     return (1.0 / OVERROUND_FLOOR) * math.exp(BETA * max(0.0, max_x))
+
+
+# ---------- 順方向予想(前日オッズスナップショット) ----------
+_forward_cache: dict[tuple[str, str], dict[int, dict]] = {}
+
+
+def forward_race_for(course: str, date_str: str, race_no: int) -> dict | None:
+    """keiba.db の前日スナップショット(scraper/odds.py が18時に保存)から、
+    当該レースの順方向予想(EV・注目馬)を返す。スナップショットが無い場合は
+    None を返し、呼び出し側は従来のオッズ不要な上界判定にフォールバックする。"""
+    key = (course, date_str)
+    if key not in _forward_cache:
+        races: list[dict] = []
+        try:
+            if KEIBA_DB_PATH.exists():
+                conn = sqlite3.connect(f"file:{KEIBA_DB_PATH}?mode=ro", uri=True)
+                _, races_f = build_forward_predictions(conn, course, date_str)
+                races = races_f or []
+                conn.close()
+        except Exception as e:
+            log.warning("%s %s: 順方向予想の計算失敗: %s", course, date_str, e)
+        _forward_cache[key] = {r["race_no"]: r for r in races}
+        if _forward_cache[key]:
+            log.info("%s %s: 前日オッズスナップショットあり(%dR)",
+                     course, date_str, len(_forward_cache[key]))
+    return _forward_cache[key].get(race_no)
 
 
 def baba_memo(verdicts: dict, course: str, surface: str) -> str:
@@ -291,15 +318,27 @@ def tweet_weight(text: str) -> int:
     return sum(1 if ord(c) < 0x1100 else 2 for c in text)
 
 
-def compose_pass_tweet(race_name: str, memo: str) -> str:
-    """前日ポスト(見送り)。分析レポート調。"""
+def compose_pass_tweet(race_name: str, memo: str,
+                       attention: dict | None = None) -> str:
+    """前日ポスト(見送り)。分析レポート調。
+    attention: 注目馬(predict.pyのhorse dict)。前日オッズがある時だけ渡される。
+    期待値プラスを意味しない相対シグナルである旨を必ず添える(サイトと同じ整理)。"""
     hashtag = race_name_to_hashtag(race_name)
+    att_lines = []
+    if attention and attention.get("horse"):
+        att_lines = [
+            f"注目馬: {attention['horse']}(前日オッズ{attention['odds']}倍・"
+            f"市場比+{round(attention['edge'] * 100)}%評価。"
+            "期待値プラスの水準ではありません)",
+            "",
+        ]
     lines = [
         f"#{hashtag} の期待値分析",
         "",
         "結論: 見送り",
         f"オッズとモデルの見解差が基準(期待値{EV_THRESHOLD})に届く馬はいません。",
         "",
+        *att_lines,
         memo,
         "",
         "全レースの分析はプロフィールのリンクから",
@@ -307,8 +346,32 @@ def compose_pass_tweet(race_name: str, memo: str) -> str:
     body = "\n".join(lines)
     if tweet_weight(body) > TWEET_LIMIT:
         # 長すぎる場合は馬場メモを落とす
-        body = "\n".join(lines[:5] + lines[6:])
-    return body
+        body = "\n".join(l for l in lines if l != memo)
+    if tweet_weight(body) > TWEET_LIMIT and attention:
+        # それでも長い場合は注目馬の説明を名前だけに短縮
+        short = f"注目馬: {attention['horse']}(期待値プラスの水準ではありません)"
+        body = body.replace(att_lines[0], short)
+    return re.sub(r"\n{3,}", "\n\n", body)
+
+
+def compose_reco_tweet(race_name: str, recos: list[dict], memo: str) -> str:
+    """前日ポスト(推奨)。v1モデルでは発生しない想定だが、
+    前日オッズでEVが閾値を超えた場合に備える。"""
+    hashtag = race_name_to_hashtag(race_name)
+    lines = [f"#{hashtag} の期待値分析", "", "結論: 買い(単勝)"]
+    for h in recos[:3]:
+        lines.append(f"◎ {h['horse']} 前日オッズ{h['odds']}倍 期待値{h['ev']:.2f}")
+    lines += [
+        "前日オッズ時点の評価です。オッズ変動で期待値は変わります。",
+        "",
+        memo,
+        "",
+        "全レースの分析はプロフィールのリンクから",
+    ]
+    body = "\n".join(lines)
+    if tweet_weight(body) > TWEET_LIMIT:
+        body = "\n".join(l for l in lines if l != memo)
+    return re.sub(r"\n{3,}", "\n\n", body)
 
 
 def compose_verify_tweet(dates: list[str], n_races: int, n_reco: int,
@@ -541,21 +604,39 @@ def main() -> int:
                                  "スキップ: 芝/ダート判定不可"))
                 continue
 
-            # 見送り判定: 期待値の上界がオッズに依らず閾値未満であることを確認。
-            # 上界が閾値以上になった場合(将来の強いモデル)は、前日オッズを
-            # 取得しないと結論が出せないため投稿をスキップして警告する。
-            v = data.get(surface) or {}
-            bound = ev_upper_bound(v.get("max_x", 0.0))
-            if bound >= EV_THRESHOLD:
-                log.warning(
-                    "%s: 期待値上界%.3f≥閾値%.2f — 前日オッズが必要。投稿スキップ",
-                    race_name, bound, EV_THRESHOLD)
-                outcomes.append((race["course"], race["grade"], race_name,
-                                 f"⚠️ 要オッズ確認(上界{bound:.2f})"))
-                continue
-
             memo = baba_memo(data, race["course"], surface)
-            text = compose_pass_tweet(race_name, memo)
+
+            # 前日オッズスナップショット(scraper/odds.py)があれば、
+            # 実オッズによる順方向のEVで結論を出す(注目馬の実名も載せる)。
+            fr = forward_race_for(race["course"],
+                                  target_dt.strftime("%Y%m%d"),
+                                  int(race["race_id"][-2:]))
+            if fr:
+                recos = [h for h in fr["horses"] if h["recommended"]]
+                att = next((h for h in fr["horses"] if h["attention"]), None)
+                if recos:
+                    text = compose_reco_tweet(race_name, recos, memo)
+                    label = f"✅ 投稿(推奨{len(recos)}頭)"
+                else:
+                    text = compose_pass_tweet(race_name, memo, attention=att)
+                    label = ("✅ 投稿(見送り宣言+注目馬)" if att
+                             else "✅ 投稿(見送り宣言)")
+            else:
+                # スナップショットなし: 期待値の上界がオッズに依らず閾値未満で
+                # あることを確認して見送りを宣言する(従来動作)。上界が閾値以上
+                # なら実オッズなしでは結論が出せないためスキップして警告。
+                v = data.get(surface) or {}
+                bound = ev_upper_bound(v.get("max_x", 0.0))
+                if bound >= EV_THRESHOLD:
+                    log.warning(
+                        "%s: 期待値上界%.3f≥閾値%.2f — 前日オッズが必要。投稿スキップ",
+                        race_name, bound, EV_THRESHOLD)
+                    outcomes.append((race["course"], race["grade"], race_name,
+                                     f"⚠️ 要オッズ確認(上界{bound:.2f})"))
+                    continue
+                text = compose_pass_tweet(race_name, memo)
+                label = "✅ 投稿(見送り宣言)"
+
             log.info("投稿本文(重み%d):\n%s", tweet_weight(text), text)
 
             if not dry_run:
@@ -564,7 +645,7 @@ def main() -> int:
             posted += 1
             outcomes.append(
                 (race["course"], race["grade"], race_name,
-                 "DRY RUN(未投稿)" if dry_run else "✅ 投稿(見送り宣言)")
+                 "DRY RUN(未投稿)" if dry_run else label)
             )
         except Exception as e:  # 1レース失敗しても他は続行
             log.exception("error on race %s: %s", race["race_name"], e)
