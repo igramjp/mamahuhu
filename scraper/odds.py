@@ -112,6 +112,13 @@ def fetch_shutuba(race_id):
         surface = None
     dist_m = re.search(r"(\d{3,4})m", text)
     distance = int(dist_m.group(1)) if dist_m else None
+    # 柵設定 A/B/C/D: "芝1200m (右 A)" の距離直後の括弧内から拾う
+    setting = None
+    m = re.search(r"m\s*[((]([^))]*)[))]", text)
+    if m:
+        sm = re.search(r"(?:^|\s)([A-D])(?:\s|$)", m.group(1))
+        if sm:
+            setting = sm.group(1)
 
     # 出馬表本体のみ(同ページの展開予想テーブルもtr.HorseListを持つ)
     table = soup.select_one("table.ShutubaTable") or soup
@@ -141,7 +148,8 @@ def fetch_shutuba(race_id):
         })
     entries.sort(key=lambda e: e["umaban"])
     return {"race_name": race_name, "surface": surface,
-            "distance": distance, "entries": entries}
+            "distance": distance, "course_setting": setting,
+            "entries": entries}
 
 
 def snapshot_date(yyyymmdd):
@@ -178,6 +186,7 @@ def snapshot_date(yyyymmdd):
                 "race_id": rid, "date": yyyymmdd, "place": place,
                 "race_no": int(rid[10:12]), "race_name": meta["race_name"],
                 "surface": meta["surface"], "distance": meta["distance"],
+                "course_setting": meta["course_setting"],
                 "snapped_at": snapped,
             }
             keiba_db.upsert_forward(conn, race, entries)

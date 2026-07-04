@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS forward_races (
     race_name  TEXT,
     surface    TEXT,               -- 芝/ダート/障害
     distance   INTEGER,
+    course_setting TEXT,           -- 柵設定 A/B/C/D (出馬表RaceData01より)
     snapped_at TEXT NOT NULL
 );
 
@@ -123,6 +124,12 @@ def connect(db_path=None):
         with conn:
             conn.execute(
                 "ALTER TABLE races ADD COLUMN source TEXT NOT NULL DEFAULT 'db'")
+    # forward_races.course_setting (2026-07-05追加、柵設定A/B/C研究の材料)
+    fcols = {r[1] for r in conn.execute("PRAGMA table_info(forward_races)")}
+    if fcols and "course_setting" not in fcols:
+        with conn:
+            conn.execute(
+                "ALTER TABLE forward_races ADD COLUMN course_setting TEXT")
     return conn
 
 
@@ -147,7 +154,7 @@ def upsert_race(conn, race, results):
 
 
 FWD_RACE_COLS = ["race_id", "date", "place", "race_no", "race_name",
-                 "surface", "distance", "snapped_at"]
+                 "surface", "distance", "course_setting", "snapped_at"]
 FWD_ENTRY_COLS = ["race_id", "umaban", "wakuban", "horse", "jockey",
                   "win_odds", "popularity", "snapped_at"]
 
