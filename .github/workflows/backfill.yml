@@ -1,0 +1,145 @@
+name: Distributed Backfill
+
+# 過去レースの分散バックフィル。月単位のmatrixジョブで取得し、
+# 部分SQLiteをartifact経由で集約、mergeジョブが1回だけコミットする。
+# ランナーは実行ごとに別IPのため、単一IPのレート制限
+# (実測: 1req/s連続約3,500リクエストで発動)を回避できる。
+# 1ジョブ≒1ヶ月≒320リクエスト・15分前後 + 並列3 で余裕を持たせる。
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_month:
+        description: '開始月 (YYYYMM)'
+        default: '202401'
+        required: true
+      to_month:
+        description: '終了月 (YYYYMM)'
+        default: '202606'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      months: ${{ steps.gen.outputs.months }}
+    steps:
+      - id: gen
+        env:
+          FROM: ${{ inputs.from_month }}
+          TO: ${{ inputs.to_month }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os
+          f, t = os.environ["FROM"], os.environ["TO"]
+          y, m = int(f[:4]), int(f[4:6])
+          months = []
+          while f"{y}{m:02d}" <= t:
+              months.append(f"{y}{m:02d}")
+              m += 1
+              if m > 12:
+                  y, m = y + 1, 1
+          assert months, "月リストが空"
+          print("months=" + json.dumps(months))
+          EOF
+
+  fetch:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        month: ${{ fromJson(needs.plan.outputs.months) }}
+      max-parallel: 3
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Backfill one month into a part DB
+        run: |
+          MONTH="${{ matrix.month }}"
+          FROM="${MONTH}01"
+          TO=$(date -d "${MONTH}01 +1 month -1 day" +%Y%m%d)
+          # db.netkeiba.com への反映待ちを考慮して4日前までに丸める
+          CAP=$(TZ=Asia/Tokyo date -d '4 days ago' +%Y%m%d)
+          if [ "$FROM" -gt "$CAP" ]; then
+            echo "対象月が未来のためスキップ"
+            exit 0
+          fi
+          if [ "$TO" -gt "$CAP" ]; then TO="$CAP"; fi
+          echo "backfill: $FROM 〜 $TO"
+          python scraper/backfill.py --from "$FROM" --to "$TO" --db "part-${MONTH}.db"
+
+      - name: Upload part DB
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: part-${{ matrix.month }}
+          path: part-*.db
+          if-no-files-found: ignore
+          retention-days: 7
+
+  merge:
+    needs: fetch
+    # 一部の月が失敗しても、取れたぶんはマージする(失敗月は再dispatchで埋める)
+    if: always() && needs.fetch.result != 'cancelled'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: data-commit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Download part DBs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: part-*
+          path: parts
+          merge-multiple: true
+
+      - name: Merge into data/keiba.db
+        run: |
+          ls -la parts/ || { echo "パートDBなし"; exit 1; }
+          python scraper/merge_db.py parts/*.db | tee merge.log
+          {
+            echo "### Distributed Backfill マージ結果"
+            echo '```'
+            tail -6 merge.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/keiba.db
+          if git diff --staged --quiet; then
+            echo "変更なし"
+            exit 0
+          fi
+          git commit -m "data: distributed backfill ${{ inputs.from_month }}-${{ inputs.to_month }}"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            sleep 15
+          done
+          exit 1
