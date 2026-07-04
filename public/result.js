@@ -1,12 +1,6 @@
 // どうだった - frontend renderer
 const $ = (s, r = document) => r.querySelector(s);
 
-async function fetchJSON(path) {
-  const r = await fetch(path);
-  if (!r.ok) throw new Error(`${r.status} ${path}`);
-  return r.json();
-}
-
 function formatDateShort(yyyymmdd) {
   const yyyy = +yyyymmdd.slice(0, 4);
   const mm = +yyyymmdd.slice(4, 6);
@@ -115,16 +109,16 @@ function renderResult(data) {
 }
 
 async function init() {
-  let index;
+  let kekkaDates;
   try {
-    index = await fetchJSON('data/index.json');
+    await SiteDB.open();
+    kekkaDates = SiteDB.kekkaDates(); // 新しい順
   } catch (e) {
     $('#report').innerHTML = '<p class="loading">データがまだ生成されていません。</p>';
     return;
   }
 
-  const kekkaItems = (index.items || []).filter(it => it.place === '結果');
-  if (kekkaItems.length === 0) {
+  if (kekkaDates.length === 0) {
     $('#report').innerHTML = '<p class="loading">結果データはまだありません。<br>2日連続で開催されると、ふりかえりが出ます。</p>';
     return;
   }
@@ -132,31 +126,29 @@ async function init() {
   const cta = $('#index-cta');
   if (cta) cta.hidden = false;
 
-  kekkaItems.sort((a, b) => b.date.localeCompare(a.date));
-
   // ?date=YYYYMMDD で過去日指定。未指定なら最新。
   const params = new URLSearchParams(window.location.search);
   const requestedDate = params.get('date');
-  let target;
+  let targetDate;
   if (requestedDate) {
-    target = kekkaItems.find(it => it.date === requestedDate);
-    if (!target) {
+    if (!kekkaDates.includes(requestedDate)) {
       $('#report').innerHTML = `<p class="loading">${requestedDate} の結果データはありません。</p>`;
       return;
     }
+    targetDate = requestedDate;
   } else {
-    target = kekkaItems[0];
+    targetDate = kekkaDates[0];
   }
 
   const ledeDate = $('#lede-date');
-  if (ledeDate) ledeDate.textContent = formatDateShort(target.date);
+  if (ledeDate) ledeDate.textContent = formatDateShort(targetDate);
 
-  try {
-    const data = await fetchJSON(`data/${target.filename}`);
-    renderResult(data);
-  } catch (e) {
-    $('#report').innerHTML = `<p class="loading">読み込みエラー: ${e.message}</p>`;
+  const data = SiteDB.kekka(targetDate);
+  if (!data) {
+    $('#report').innerHTML = `<p class="loading">${targetDate} の結果データはありません。</p>`;
+    return;
   }
+  renderResult(data);
 }
 
 init();

@@ -6,3 +6,8 @@ venv/
 .DS_Store
 *.swp
 node_modules/
+
+# SQLite一時ファイル(本体 data/keiba.db はコミットする)
+*.db-wal
+*.db-shm
+*.db-journal

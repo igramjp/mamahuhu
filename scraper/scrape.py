@@ -1,22 +1,24 @@
 """
-netkeibaから直近開催のレース結果を取得し、各競馬場ごとに分析結果を
-public/data/{date}_{place}.json として出力する。
+netkeibaから直近開催のレース結果を取得し、各競馬場ごとの分析結果を
+public/data/site.db (SQLite) に書き込む。
 
 GitHub Actionsから1日1回呼び出される想定。
+旧: public/data/{date}_{place}.json 出力。2026-07にSQLite化(JSON廃止)。
+結果ふりかえり(旧{date}_結果.json)とindex.jsonはフロント側でsite.dbから
+導出するため生成しない。
 """
 
-import json
-import os
 import re
 import sys
 import time
 from datetime import date, datetime, timedelta
 from io import StringIO
-from pathlib import Path
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+
+import site_db
 
 COURSE = {
     "札幌": "01", "函館": "02", "福島": "03", "新潟": "04", "東京": "05",
@@ -28,7 +30,6 @@ HEADERS = {
         "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
 }
-DATA_DIR = Path(__file__).resolve().parent.parent / "public" / "data"
 SLEEP_BETWEEN_RACES = 1.5  # 秒
 SLEEP_BETWEEN_PLACES = 2.0
 
@@ -612,8 +613,8 @@ def is_opening_day(race_ids):
     return days == {"01"}
 
 
-def raced_same_track_prev_week(place, yyyymmdd, lookback=8):
-    """前週(直近lookback日以内)に同一競馬場の開催JSONが存在するか。
+def raced_same_track_prev_week(conn, place, yyyymmdd, lookback=8):
+    """前週(直近lookback日以内)に同一競馬場の開催データが存在するか。
     回の初日(コード01)でも、前週が同じ競馬場なら(例: 2回東京→3回東京)
     馬場が連続しておりバイアス比較は有効。逆に前走の馬場データが「別競馬場」
     になるのは、前週まで別の場で開催していた新規場入りの初日のみ。"""
@@ -621,14 +622,14 @@ def raced_same_track_prev_week(place, yyyymmdd, lookback=8):
         d = datetime.strptime(yyyymmdd, "%Y%m%d").date()
     except ValueError:
         return False
-    for i in range(1, lookback + 1):
-        prev = (d - timedelta(days=i)).strftime("%Y%m%d")
-        if (DATA_DIR / f"{prev}_{place}.json").exists():
-            return True
-    return False
+    date_from = (d - timedelta(days=lookback)).strftime("%Y%m%d")
+    row = conn.execute(
+        "SELECT 1 FROM reports WHERE place = ? AND date >= ? AND date < ? LIMIT 1",
+        (place, date_from, yyyymmdd)).fetchone()
+    return row is not None
 
 
-def process_place(place, target_date=None):
+def process_place(conn, place, target_date=None):
     print(f"\n=== {place} ===")
     use_realtime = _use_realtime(target_date)
     id_fetcher = get_race_ids_realtime if use_realtime else get_race_ids
@@ -648,30 +649,25 @@ def process_place(place, target_date=None):
             print(f"[{place}] 直近2週間に開催なし")
             return None
 
-    if is_opening_day(ids) and not raced_same_track_prev_week(place, yyyymmdd):
+    if is_opening_day(ids) and not raced_same_track_prev_week(conn, place, yyyymmdd):
         print(f"[{place}] {yyyymmdd}: 新規場入りの開催初日のためスキップ(別競馬場とバイアス比較無意味)")
         return None
 
     print(f"[{place}] 開催日: {yyyymmdd} / {len(ids)}R")
 
     new_source = "realtime" if use_realtime else "db"
-    out_path = DATA_DIR / f"{yyyymmdd}_{place}.json"
-    if out_path.exists():
-        try:
-            existing = json.loads(out_path.read_text(encoding="utf-8"))
-        except Exception:
-            existing = {}
-        if "races" in existing:
-            existing_source = existing.get("source", "db")
-            # 火曜rebuildで realtime → db に格上げするケースだけは上書き許可。
-            # 既存と同じ精度(realtime→realtime, db→db) や db→realtime の格下げはスキップ。
-            if existing_source == "realtime" and new_source == "db":
-                print(f"[{place}] 既存={existing_source} を db で上書きします")
-            else:
-                print(f"[{place}] 既存ファイルあり、スキップ: {out_path.name} (source={existing_source})")
-                return {"place": place, "date": yyyymmdd, "filename": out_path.name}
+    existing = conn.execute(
+        "SELECT source FROM reports WHERE date = ? AND place = ?",
+        (yyyymmdd, place)).fetchone()
+    if existing:
+        existing_source = existing[0] or "db"
+        # 火曜rebuildで realtime → db に格上げするケースだけは上書き許可。
+        # 既存と同じ精度(realtime→realtime, db→db) や db→realtime の格下げはスキップ。
+        if existing_source == "realtime" and new_source == "db":
+            print(f"[{place}] 既存={existing_source} を db で上書きします")
         else:
-            print(f"[{place}] 既存ファイルにレース詳細なし、再処理します")
+            print(f"[{place}] 既存データあり、スキップ: {yyyymmdd}_{place} (source={existing_source})")
+            return {"place": place, "date": yyyymmdd}
 
     dfs = []
     for rid in ids:
@@ -696,40 +692,9 @@ def process_place(place, target_date=None):
     else:
         print(f"[{place}] 注目レース: 翌開催日の出馬表未公開のためスキップ")
 
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(analysis, f, ensure_ascii=False, indent=2)
-    print(f"[{place}] 保存: {out_path.name}")
-    return {"place": place, "date": yyyymmdd, "filename": out_path.name}
-
-
-def update_index():
-    items = []
-    for f in DATA_DIR.glob("*.json"):
-        if f.name == "index.json":
-            continue
-        m = re.match(r"(\d{8})_(.+)\.json", f.name)
-        if m:
-            items.append({
-                "date": m.group(1),
-                "place": m.group(2),
-                "filename": f.name,
-            })
-    # date は降順 (新しい順)、同一日内では place は昇順
-    items.sort(key=lambda x: x["place"])
-    items.sort(key=lambda x: x["date"], reverse=True)
-
-    index = {
-        "updated_at": datetime.now().isoformat(timespec="seconds"),
-        "count": len(items),
-        "items": items,
-    }
-    with open(DATA_DIR / "index.json", "w", encoding="utf-8") as f:
-        json.dump(index, f, ensure_ascii=False, indent=2)
-    print(f"\nindex.json: {len(items)}件")
-
-
-FRAME_LABEL = {"内": "内枠", "外": "外枠"}
+    site_db.write_report(conn, analysis)
+    print(f"[{place}] site.db 保存: {yyyymmdd}_{place}")
+    return {"place": place, "date": yyyymmdd}
 
 
 def _normalize_jockey_name(name):
@@ -741,195 +706,34 @@ def _normalize_jockey_name(name):
     return re.sub(r"^[▲★△◇▽◎○☆▼]+", "", name).strip()
 
 
-def _jockey_in_hot_set(jockey_today, hot_names):
-    """today側(realtime=3字省略のことが多い)と prev側hot_jockeyのフル名を
-    prefix一致で照合。記号は両側で除去してから判定する。"""
-    j = _normalize_jockey_name(jockey_today)
-    if not j:
-        return False
-    for hn in hot_names:
-        hnn = _normalize_jockey_name(hn)
-        if not hnn:
-            continue
-        if hnn.startswith(j) or j.startswith(hnn):
-            return True
-    return False
+def _find_latest_kaisai_date(conn):
+    """site.db 内で最も新しい開催日(YYYYMMDD)を返す。なければ None。"""
+    row = conn.execute("SELECT MAX(date) FROM reports").fetchone()
+    return row[0] if row else None
 
 
-def _winning_entry(bias_list, key):
-    """frame_bias / style_bias から複勝率最大の区分名を返す。"""
-    if not bias_list:
-        return None
-    best = max(bias_list, key=lambda x: (x["複勝率"], x["出走数"]))
-    return best[key]
-
-
-def _build_kekka_for_place(today_data, prev_data, hot_jockey_names):
-    """hot_jockey_names は前日全場合算のセット。騎手は土日で競馬場を移動する
-    ことがあるため、その場の前日だけでなく全場union で照合する。"""
-    winning_by_surface = {}
-    surfaces_combo = {}
-    for surface, sdata in (prev_data.get("surfaces") or {}).items():
-        winning_by_surface[surface] = {
-            "frame": _winning_entry(sdata.get("frame_bias", []), "内外"),
-            "style": _winning_entry(sdata.get("style_bias", []), "脚質"),
-        }
-        bc = sdata.get("best_combo")
-        if bc:
-            surfaces_combo[surface] = bc
-
-    races_out = []
-    for race in today_data.get("races", []):
-        surface = race.get("surface")
-        win = winning_by_surface.get(surface, {"frame": None, "style": None})
-        hits = []
-        for horse in race.get("top3", []):
-            labels = []
-            if win["frame"] and horse.get("内外") == win["frame"]:
-                labels.append(FRAME_LABEL.get(horse["内外"], horse["内外"]))
-            if win["style"] and horse.get("脚質") == win["style"]:
-                labels.append(horse["脚質"])
-            if horse.get("騎手") and _jockey_in_hot_set(horse["騎手"], hot_jockey_names):
-                labels.append(horse["騎手"])
-            hits.append({
-                "着順": horse["着順"],
-                "馬番": horse.get("馬番"),
-                "labels": labels,
-            })
-        races_out.append({
-            "R": race["R"],
-            "surface": surface,
-            "race_name": race.get("race_name"),
-            "hits": hits,
-        })
-
-    return {
-        "place": today_data["place"],
-        "prev_date": prev_data["date"],
-        "surfaces": surfaces_combo,
-        "races": races_out,
-    }
-
-
-def _find_prev_kaisai_date(target_date):
-    """target_date 未満で最も新しい開催日(YYYYMMDD)を返す。なければ None。
-    "前日" だと土曜は金曜=非開催で照合不能になるため、"直近の開催日" を採用する
-    (例: 20260516(土) → 20260510(前週日) を返す)。"""
-    candidates = set()
-    for f in DATA_DIR.glob("*.json"):
-        if f.name == "index.json":
-            continue
-        m = re.match(r"(\d{8})_(.+)\.json", f.name)
-        if not m:
-            continue
-        if m.group(2) == "結果":
-            continue
-        if m.group(1) < target_date:
-            candidates.add(m.group(1))
-    return max(candidates) if candidates else None
-
-
-def build_kekka(target_date):
-    """{target_date}_結果.json を生成。直近開催日(target_date 未満で最も新しい
-    データ日)を prev とし、そのバイアス・hot_jockeysと今日のtop3を照合する。"""
-    prev_date = _find_prev_kaisai_date(target_date)
-    if not prev_date:
-        print(f"\n結果({target_date}): 直近開催データなし、生成スキップ")
-        return
-    out_filename = f"{target_date}_結果.json"
-    prev_kekka = f"{prev_date}_結果.json"
-
-    # 騎手は土日で開催場を移動する(土=東京、日=京都 等)。前日hot_jockeysは
-    # 「前日同一場」ではなく「前日全場の合算」で照合する。
-    hot_jockey_names = set()
-    for pf in DATA_DIR.glob(f"{prev_date}_*.json"):
-        if pf.name == prev_kekka:
-            continue
-        try:
-            pdata = json.loads(pf.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        for hj in (pdata.get("hot_jockeys") or []):
-            if hj.get("騎手"):
-                hot_jockey_names.add(hj["騎手"])
-
-    places_out = []
-    for f in sorted(DATA_DIR.glob(f"{target_date}_*.json")):
-        if f.name == out_filename:
-            continue
-        m = re.match(rf"{target_date}_(.+)\.json", f.name)
-        if not m:
-            continue
-        place = m.group(1)
-        prev_path = DATA_DIR / f"{prev_date}_{place}.json"
-        if not prev_path.exists():
-            continue
-        today_data = json.loads(f.read_text(encoding="utf-8"))
-        prev_data = json.loads(prev_path.read_text(encoding="utf-8"))
-        if "races" not in today_data:
-            print(f"  [{place}] racesフィールドなし、結果スキップ")
-            continue
-        places_out.append(_build_kekka_for_place(today_data, prev_data, hot_jockey_names))
-
-    if not places_out:
-        print(f"\n結果({target_date}): 前日データなし、生成スキップ")
-        return
-
-    out = {
-        "date": target_date,
-        "prev_date": prev_date,
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
-        "places": places_out,
-    }
-    out_path = DATA_DIR / out_filename
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
-    print(f"\n結果: {out_path.name} ({len(places_out)}場)")
-
-
-def _find_latest_kaisai_date():
-    """public/data 内で最も新しい開催日(YYYYMMDD)を返す。なければ None。
-    結果ファイル(_結果.json)は除外。"""
-    candidates = set()
-    for f in DATA_DIR.glob("*.json"):
-        if f.name == "index.json":
-            continue
-        m = re.match(r"(\d{8})_(.+)\.json", f.name)
-        if not m or m.group(2) == "結果":
-            continue
-        candidates.add(m.group(1))
-    return max(candidates) if candidates else None
-
-
-def update_notable_races(target_date=None):
-    """target_date(未指定なら直近開催日)の各場JSONについて、notable_race だけ
+def update_notable_races(conn, target_date=None):
+    """target_date(未指定なら直近開催日)の各場について、notable_race だけ
     再取得して上書きする。金曜18時JST想定: 翌日(土)の出馬表は公開済みなので、
     日曜scrape時点で None だった notable_race を埋め直せる。"""
     if not target_date:
-        target_date = _find_latest_kaisai_date()
+        target_date = _find_latest_kaisai_date(conn)
         if not target_date:
             print("対象データなし")
             return
     print(f"\n=== notable_race 更新: {target_date} ===")
     updated = 0
-    for f in sorted(DATA_DIR.glob(f"{target_date}_*.json")):
-        m = re.match(rf"{target_date}_(.+)\.json", f.name)
-        if not m or m.group(1) == "結果":
-            continue
-        place = m.group(1)
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-        except Exception as e:
-            print(f"  [{place}] 読み込みエラー: {e}")
-            continue
+    places = [r[0] for r in conn.execute(
+        "SELECT place FROM reports WHERE date = ? ORDER BY place", (target_date,))]
+    for place in places:
         nr = build_notable_race(target_date, place)
         if not nr:
             print(f"  [{place}] 注目レース: 取れず(出馬表未公開?)、スキップ")
             continue
-        data["notable_race"] = nr
-        data["generated_at"] = datetime.now().isoformat(timespec="seconds")
-        with open(f, "w", encoding="utf-8") as out:
-            json.dump(data, out, ensure_ascii=False, indent=2)
+        site_db.write_notable(conn, target_date, place, nr)
+        site_db.touch_generated_at(
+            conn, target_date, place,
+            datetime.now().isoformat(timespec="seconds"))
         print(f"  [{place}] 注目レース更新: {nr['date']} 11R ({nr.get('race_name') or '?'})")
         updated += 1
         time.sleep(SLEEP_BETWEEN_PLACES)
@@ -937,32 +741,24 @@ def update_notable_races(target_date=None):
 
 
 def main():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    conn = site_db.connect()
     args = sys.argv[1:]
     if "--notable-only" in args:
         args.remove("--notable-only")
         target_date = args[0] if args else None
-        update_notable_races(target_date)
-        update_index()
+        update_notable_races(conn, target_date)
         return
     target_date = args[0] if args else None
     if target_date:
         print(f"対象日付: {target_date}")
 
-    dates_touched = set()
     for place in COURSE.keys():
         try:
-            result = process_place(place, target_date)
-            if result:
-                dates_touched.add(result["date"])
+            process_place(conn, place, target_date)
         except Exception as e:
             print(f"[{place}] エラー: {e}")
         time.sleep(SLEEP_BETWEEN_PLACES)
 
-    for d in sorted(dates_touched):
-        build_kekka(d)
-
-    update_index()
     print("\n完了")
 
 

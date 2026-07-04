@@ -19,12 +19,18 @@
   to = "/result.html"
   status = 200
 
-# キャッシュ設定: JSONは300秒。HTML/CSS/JSはファイル名固定のため
+# キャッシュ設定: site.db(SQLite)は300秒。HTML/CSS/JSはファイル名固定のため
 # 毎回サーバに確認(未変更は304で軽量、変更時は即反映)させる。
 [[headers]]
-  for = "/data/*.json"
+  for = "/data/site.db"
   [headers.values]
     Cache-Control = "public, max-age=300, must-revalidate"
+
+# sql.js(WASM)はバージョン更新時のみ変わるので1日キャッシュ
+[[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
 
 [[headers]]
   for = "/*.html"

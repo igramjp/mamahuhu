@@ -6,11 +6,16 @@ on:
     # 最終Rが16:30前後で終わってから1時間〜90分後。realtime/dbともに脚質は
     # 前走から算出するため、bias計算は同じ結果になる。
     - cron: '0 9 * * SAT,SUN'
-    # 金曜18時JST = 金曜09:00 UTC → 直近開催日(=前週日曜)JSONの notable_race のみ
+    # 金曜18時JST = 金曜09:00 UTC → 直近開催日(=前週日曜)の notable_race のみ
     # 埋め直し。日曜scrape時点では翌週末の出馬表が未公開で None のままなので、
     # 翌日(土)の出馬表が出揃った金曜夕方に取得する。
     - cron: '0 9 * * FRI'
-  # 手動実行: mode=weekend(当日realtime)/rebuild(前週末をdbで取り直し)/notable(翌週末出馬表)
+    # 火曜18時JST = 09:00 UTC → 前週末の生データを db.netkeiba.com から
+    # data/keiba.db に取り込む(長期ベースライン・予想モデル用)。
+    # db側への反映が火曜頃のためこのタイミング。
+    - cron: '0 9 * * TUE'
+  # 手動実行: mode=weekend(当日realtime)/rebuild(前週末をdbで取り直し)
+  #          /notable(翌週末出馬表)/rawdb(keiba.dbへ前週末取り込み)
   # 月曜祝日開催等は weekend、realtime取得が壊れた場合は rebuild。
   workflow_dispatch:
     inputs:
@@ -23,6 +28,7 @@ on:
           - weekend
           - rebuild
           - notable
+          - rawdb
 
 jobs:
   scrape:
@@ -68,15 +74,23 @@ jobs:
       - name: Run scraper (notable_race update)
         if: github.event.schedule == '0 9 * * FRI' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'notable')
         run: |
-          # 直近開催日(=前週日曜)のJSONを開き、翌日(土)の出馬表が
+          # 直近開催日(=前週日曜)の各場データについて、翌日(土)の出馬表が
           # 公開されていれば notable_race を埋め直す。全レース再scrape はしない。
           python scraper/scrape.py --notable-only
+
+      - name: Backfill raw data into keiba.db (Tuesday)
+        if: github.event.schedule == '0 9 * * TUE' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'rawdb')
+        run: |
+          # 前週末(直近8日)の生データを db.netkeiba.com から data/keiba.db へ。
+          # 冪等(取得済みはスキップ)。長期ベースライン・予想モデルの材料。
+          FROM=$(TZ=Asia/Tokyo date -d '8 days ago' +%Y%m%d)
+          python scraper/backfill.py --from "$FROM"
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/data/
+          git add public/data/ data/
           if git diff --staged --quiet; then
             echo "変更なし"
           else

@@ -6,12 +6,6 @@ const SURFACE_META = {
   ダート: { cls: "dirt" },
 };
 
-async function fetchJSON(path) {
-  const r = await fetch(path);
-  if (!r.ok) throw new Error(`${r.status} ${path}`);
-  return r.json();
-}
-
 const pct = (v) => (v * 100).toFixed(1) + "%";
 
 function biasTable(rows, firstColLabel, firstColKey) {
@@ -185,22 +179,23 @@ function renderReport(data, surface, place, hotJockeysAllPlaces) {
 }
 
 async function init() {
-  let index;
+  let placeItems;
   try {
-    index = await fetchJSON("data/index.json");
+    await SiteDB.open();
+    placeItems = SiteDB.indexItems();
   } catch (e) {
     $("#report").innerHTML =
       '<p class="loading">データがまだ生成されていません。<br>GitHub Actionsの初回実行（または手動実行）後に表示されます。</p>';
     return;
   }
 
-  if (!index.items || index.items.length === 0) {
+  if (placeItems.length === 0) {
     $("#report").innerHTML = '<p class="loading">データがありません。</p>';
     return;
   }
 
-  // 結果データがあればCTAボタンを表示
-  if (index.items.some((it) => it.place === "結果")) {
+  // 結果(ふりかえり)が導出できる日があればCTAボタンを表示
+  if (SiteDB.kekkaDates().length > 0) {
     const cta = $("#result-cta");
     if (cta) cta.hidden = false;
   }
@@ -209,8 +204,6 @@ async function init() {
   const params = new URLSearchParams(window.location.search);
   const requestedDate = params.get("date");
 
-  // 結果ファイルは別ページなので場ボタンから除外
-  const placeItems = index.items.filter((it) => it.place !== "結果");
   const availableDates = [...new Set(placeItems.map((it) => it.date))]
     .sort()
     .reverse();
@@ -228,27 +221,18 @@ async function init() {
   }
 
   const latestItems = placeItems.filter((it) => it.date === targetDate);
+  for (const it of latestItems) it.key = `${it.date}_${it.place}`;
 
-  // 当日全場のデータを並列fetch。注目レースの騎手chipを当日全競馬場の
-  // 好調騎手とマッチさせるため(土曜は東京、日曜は京都など移動するため
-  // 単一場の好調騎手リストでは取りこぼす)。各場のJSONはここで一度だけ
-  // 取得して dataByFilename にキャッシュし、ボタン押下時に再利用する。
-  $("#report").innerHTML = '<p class="loading">読み込み中...</p>';
-  const dataByFilename = {};
+  // 当日全場のデータをsite.dbから組み立て。注目レースの騎手chipを当日
+  // 全競馬場の好調騎手とマッチさせるため(土曜は東京、日曜は京都など
+  // 移動するため単一場の好調騎手リストでは取りこぼす)。
+  const dataByKey = {};
   let hotJockeysAllPlaces = [];
-  try {
-    const all = await Promise.all(
-      latestItems.map(async (it) => {
-        const d = await fetchJSON(`data/${it.filename}`);
-        dataByFilename[it.filename] = d;
-        return d;
-      }),
-    );
-    hotJockeysAllPlaces = all.flatMap((d) => d.hot_jockeys || []);
-  } catch (e) {
-    $("#report").innerHTML =
-      `<p class="loading">読み込みエラー: ${e.message}</p>`;
-    return;
+  for (const it of latestItems) {
+    const d = SiteDB.report(it.date, it.place);
+    if (!d) continue;
+    dataByKey[it.key] = d;
+    hotJockeysAllPlaces.push(...(d.hot_jockeys || []));
   }
 
   // 見出し: 集計日(過去日)だと古く見えるので、当週の注目レース名を出す。
@@ -256,7 +240,7 @@ async function init() {
   // 重賞が複数なら格上(G1>G2>G3)を優先。
   const gradeRank = { G1: 1, G2: 2, G3: 3 };
   const topGraded = latestItems
-    .map((it) => ({ it, nr: (dataByFilename[it.filename] || {}).notable_race }))
+    .map((it) => ({ it, nr: (dataByKey[it.key] || {}).notable_race }))
     .filter((x) => x.nr && x.nr.race_name && gradeRank[x.nr.grade])
     .sort((a, b) => gradeRank[a.nr.grade] - gradeRank[b.nr.grade])[0];
   $("#date-display").textContent = topGraded
@@ -267,17 +251,15 @@ async function init() {
   // 無ければ先頭の場・芝。
   const btnContainer = $("#place-buttons");
   const surfBtnContainer = $("#surface-buttons");
-  let currentFilename = topGraded
-    ? topGraded.it.filename
-    : latestItems[0].filename;
+  let currentKey = topGraded ? topGraded.it.key : latestItems[0].key;
   let currentPlace = topGraded ? topGraded.it.place : latestItems[0].place;
   let currentSurface = (topGraded && topGraded.nr.surface) || "芝";
 
-  function loadAndRender(filename) {
-    const data = dataByFilename[filename];
+  function loadAndRender(key) {
+    const data = dataByKey[key];
     if (!data) {
       $("#report").innerHTML =
-        `<p class="loading">読み込みエラー: ${filename}</p>`;
+        `<p class="loading">読み込みエラー: ${key}</p>`;
       return;
     }
     renderReport(data, currentSurface, currentPlace, hotJockeysAllPlaces);
@@ -287,16 +269,16 @@ async function init() {
     const btn = document.createElement("button");
     btn.className = "place-btn";
     btn.textContent = it.place;
-    btn.dataset.filename = it.filename;
-    if (it.filename === currentFilename) btn.classList.add("active");
+    btn.dataset.key = it.key;
+    if (it.key === currentKey) btn.classList.add("active");
     btn.addEventListener("click", () => {
       btnContainer
         .querySelectorAll(".place-btn")
         .forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      currentFilename = it.filename;
+      currentKey = it.key;
       currentPlace = it.place;
-      loadAndRender(it.filename);
+      loadAndRender(it.key);
     });
     btnContainer.appendChild(btn);
   }
@@ -312,12 +294,12 @@ async function init() {
         .forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       currentSurface = s;
-      loadAndRender(currentFilename);
+      loadAndRender(currentKey);
     });
     surfBtnContainer.appendChild(btn);
   }
 
-  loadAndRender(currentFilename);
+  loadAndRender(currentKey);
 }
 
 function formatDateWithDow(yyyymmdd) {

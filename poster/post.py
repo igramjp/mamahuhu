@@ -2,7 +2,9 @@
 mamahuhu X auto-poster
 
 毎週土日の朝、その日のG3以上のメインレースを netkeiba から取得し、
-mamahuhu.app の直近開催結果データ (バイアス + 好調騎手) を組み合わせて X に投稿する。
+直近開催結果データ (バイアス + 好調騎手) を組み合わせて X に投稿する。
+バイアスデータは同一リポジトリ内の public/data/site.db (SQLite) から読む
+(旧: mamahuhu.app の JSON を HTTP 取得)。
 
 メインツイート: バイアス + 該当する好調騎手
 リプライ: mamahuhu の URL
@@ -16,10 +18,11 @@ import argparse
 import logging
 import os
 import re
+import sqlite3
 import sys
 import time
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
+from pathlib import Path
 
 import requests
 import tweepy
@@ -28,13 +31,12 @@ from bs4 import BeautifulSoup
 # ---------- 定数 ----------
 JST = timezone(timedelta(hours=9))
 NETKEIBA_BASE = "https://race.netkeiba.com"
-MAMAHUHU_DATA_BASE = "https://mamahuhu.app/data"
+SITE_DB_PATH = Path(__file__).resolve().parent.parent / "public" / "data" / "site.db"
 USER_AGENT = "mamahuhu-bot/1.0 (+https://mamahuhu.app/)"
 MAMAHUHU_URL = "https://mamahuhu.app/"
 REQUEST_TIMEOUT = 30
 SLEEP_BETWEEN_SCRAPE = 2   # netkeibaへの負荷軽減
 SLEEP_BETWEEN_POST = 5     # X側のレート制限対策
-SLEEP_BETWEEN_DATA = 0.3   # mamahuhu.appへの負荷軽減
 TWEET_LIMIT = 280          # X weighted length 上限
 
 # race_id の 5-6 桁目 = JRA 競馬場コード
@@ -62,32 +64,51 @@ def fetch_html(url: str) -> str:
     return r.text
 
 
-def fetch_json(url: str) -> dict | None:
-    """JSON取得。404はNone、それ以外の失敗は例外。"""
-    r = requests.get(
-        url, headers={"User-Agent": USER_AGENT}, timeout=REQUEST_TIMEOUT
-    )
-    if r.status_code == 404:
-        return None
-    r.raise_for_status()
-    return r.json()
+# ---------- mamahuhu data (site.db) ----------
+_site_db_conn: sqlite3.Connection | None = None
 
 
-# ---------- mamahuhu data ----------
+def _site_db() -> sqlite3.Connection:
+    global _site_db_conn
+    if _site_db_conn is None:
+        if not SITE_DB_PATH.exists():
+            raise FileNotFoundError(f"site.db がありません: {SITE_DB_PATH}")
+        _site_db_conn = sqlite3.connect(f"file:{SITE_DB_PATH}?mode=ro", uri=True)
+    return _site_db_conn
+
+
 def fetch_race_data_on(course: str, date_dt: datetime) -> dict | None:
-    """指定日のJSONを取得。404はNone。"""
+    """指定日の開催データを site.db から読み、旧JSONと同形のdictで返す。
+    (使うのは surfaces.*.best_combo と hot_jockeys のみ)。データなしはNone。"""
     date_str = date_dt.strftime("%Y%m%d")
-    url = f"{MAMAHUHU_DATA_BASE}/{date_str}_{quote(course)}.json"
-    try:
-        data = fetch_json(url)
-    except Exception as e:
-        log.warning("fetch error %s: %s", url, e)
-        return None
-    if data is None:
+    conn = _site_db()
+    rep = conn.execute(
+        "SELECT 1 FROM reports WHERE date = ? AND place = ?",
+        (date_str, course)).fetchone()
+    if rep is None:
         log.info("%s: %s のデータなし", course, date_str)
-    else:
-        log.info("%s: 開催データ取得 (%s)", course, date_str)
-    return data
+        return None
+
+    surfaces: dict = {}
+    for surface, frame, style, rate, n in conn.execute(
+        "SELECT surface, best_combo_frame, best_combo_style,"
+        " best_combo_rate, best_combo_n"
+        " FROM surface_stats WHERE date = ? AND place = ?",
+        (date_str, course)):
+        best_combo = None
+        if frame:
+            best_combo = {"内外": frame, "脚質": style,
+                          "複勝率": rate, "出走数": n}
+        surfaces[surface] = {"best_combo": best_combo}
+
+    hot_jockeys = [
+        {"騎手": j} for (j,) in conn.execute(
+            "SELECT jockey FROM hot_jockeys WHERE date = ? AND place = ?"
+            " ORDER BY max_pop_diff DESC, jockey", (date_str, course))
+    ]
+
+    log.info("%s: 開催データ取得 (%s)", course, date_str)
+    return {"surfaces": surfaces, "hot_jockeys": hot_jockeys}
 
 
 def get_best_combo(data: dict, surface: str) -> dict:
@@ -471,9 +492,8 @@ def main() -> int:
         d = fetch_race_data_on(course, src_dt)
         if d is not None:
             data_cache[course] = d
-        time.sleep(SLEEP_BETWEEN_DATA)
 
-    # 好調騎手は全開催場のJSONをユニオン (前日から移動してくる騎手対策)
+    # 好調騎手は全開催場のデータをユニオン (前日から移動してくる騎手対策)
     all_hot_jockeys: list[str] = []
     seen: set[str] = set()
     for d in data_cache.values():
