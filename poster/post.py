@@ -1,21 +1,27 @@
 """
 mamahuhu X auto-poster
 
-毎週金・土の20時、翌日のG3以上のメインレースを netkeiba から取得し、
-直近開催のバイアスデータを組み合わせて X に投稿する。
-バイアスデータは同一リポジトリ内の public/data/site.db (SQLite) から読む
-(旧: mamahuhu.app の JSON を HTTP 取得)。
+■ 前日ポスト(金・土 20:00 JST)
+  翌日のG3以上レースについて期待値分析の結論を投稿する。
+  v1モデルは β が小さく、オッズに依らず期待値の上界が閾値未満のため
+  「見送り」を前日にリークなしで宣言できる(run_preview 内の上界判定)。
+  上界が閾値を超えるモデルに更新された場合は投稿をスキップして警告する
+  (前日オッズ取得パイプラインの実装が必要になったシグナル)。
 
-メインツイート: バイアス + 該当馬
-リプライ: mamahuhu の URL
+■ 結果検証ポスト(火 20:00 JST, --verify)
+  直近週末の判断(見送り/推奨)と検証(的中・回収率・全馬ベット基準)を投稿。
 
-cost: メイン($0.015) + リプライ($0.01) = 約$0.025/レース
+データは同一リポジトリ内の public/data/site.db / data/keiba.db から読む。
+モデルパラメータ(β・EV閾値)は scraper/predict.py を単一の真実として参照。
+
+cost: メイン($0.015) + リプライ($0.01) = 約$0.025/投稿
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import math
 import os
 import re
 import sqlite3
@@ -28,6 +34,10 @@ import requests
 import tweepy
 from bs4 import BeautifulSoup
 
+# モデルパラメータは scraper/predict.py を単一の真実として参照する
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scraper"))
+from predict import BETA, EV_THRESHOLD, MODEL_VERSION  # noqa: E402
+
 # ---------- 定数 ----------
 JST = timezone(timedelta(hours=9))
 NETKEIBA_BASE = "https://race.netkeiba.com"
@@ -38,6 +48,10 @@ REQUEST_TIMEOUT = 30
 SLEEP_BETWEEN_SCRAPE = 2   # netkeibaへの負荷軽減
 SLEEP_BETWEEN_POST = 5     # X側のレート制限対策
 TWEET_LIMIT = 280          # X weighted length 上限
+KEIBA_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "keiba.db"
+RESULT_URL = "https://mamahuhu.app/result"
+# JRA単勝のオーバーラウンド(Σ1/オッズ)の下限目安。期待値上界の計算に使う
+OVERROUND_FLOOR = 1.15
 
 # race_id の 5-6 桁目 = JRA 競馬場コード
 TRACK_CODES = {
@@ -83,8 +97,11 @@ MIN_N = 8
 
 
 def fetch_race_data_on(course: str, date_dt: datetime) -> dict | None:
-    """指定日の馬場よみ(bias3)を site.db から読み、コース種別ごとの
-    「来てる」グループを返す: {surface: {"frame": 内/中/外|None, "style": ...|None}}。
+    """指定日のバイアス分析(bias3)を site.db から読む。
+    戻り値: {surface: {"frame": grp|None, "frame_dev": float|None,
+                       "style": grp|None, "max_x": float}}
+    frame/style は有意な有利化グループ(n>=8, Δ<=-0.01, 最小Δ)。
+    max_x は全グループの正の補正項(-Δ)の最大値で、期待値上界の計算に使う。
     データなしはNone。"""
     date_str = date_dt.strftime("%Y%m%d")
     conn = _site_db()
@@ -92,44 +109,52 @@ def fetch_race_data_on(course: str, date_dt: datetime) -> dict | None:
     surfaces: dict = {}
     for surface, kind, grp, deviation, n in conn.execute(
         "SELECT surface, kind, grp, deviation, n FROM bias3_stats"
-        " WHERE date = ? AND place = ?", (date_str, course)):
+        " WHERE date = ? AND place = ? AND dist_cat = 'ALL'",
+            (date_str, course)):
         key = "frame" if kind == "frame3" else "style"
-        s = surfaces.setdefault(surface, {"frame": None, "style": None,
-                                          "_best": {}})
-        if (n or 0) < MIN_N or deviation is None or deviation > -DEV_THRESHOLD:
+        s = surfaces.setdefault(
+            surface, {"frame": None, "frame_dev": None, "style": None,
+                      "max_x": 0.0, "_best": {}})
+        dev = deviation if deviation is not None else 0.0
+        s["max_x"] = max(s["max_x"], -dev)
+        if (n or 0) < MIN_N or dev > -DEV_THRESHOLD:
             continue
         best = s["_best"].get(key)
-        if best is None or deviation < best:
-            s["_best"][key] = deviation
+        if best is None or dev < best:
+            s["_best"][key] = dev
             s[key] = grp
+            if key == "frame":
+                s["frame_dev"] = dev
 
     if not surfaces:
-        log.info("%s: %s の馬場よみデータなし", course, date_str)
+        log.info("%s: %s のバイアス分析データなし", course, date_str)
         return None
     for s in surfaces.values():
         s.pop("_best", None)
-    log.info("%s: 馬場よみ取得 (%s) %s", course, date_str, surfaces)
+    log.info("%s: バイアス分析取得 (%s) %s", course, date_str, surfaces)
     return surfaces
 
 
-def derive_bias(verdicts: dict, surface: str) -> str | None:
-    """コース種別の「来てる」グループを投稿文用に整形。どちらも無ければNone。"""
+def ev_upper_bound(max_x: float) -> float:
+    """オッズに依らない期待値の上界。
+    市場確率×オッズ ≦ 1/オーバーラウンド下限、モデル補正は e^(β·x) 倍まで。
+    この値が閾値未満なら、どんなオッズでも推奨は発生しない=見送り確定。"""
+    return (1.0 / OVERROUND_FLOOR) * math.exp(BETA * max(0.0, max_x))
+
+
+def baba_memo(verdicts: dict, course: str, surface: str) -> str:
+    """馬場メモの一行を生成(サイトの用語と一致させる)。"""
     v = (verdicts or {}).get(surface)
+    label = f"{course}・{surface}"
     if not v:
-        return None
-    parts = []
-    if v.get("frame"):
-        parts.append(f"{v['frame']}枠")
-    if v.get("style"):
-        parts.append(v["style"])
-    if not parts:
-        return None
-    return "いつもより" + "・".join(parts) + "が来てる"
-
-
-def style_from_last_corner(last_corner: int, field_size: int) -> str:
-    """前走の4コーナー通過順位を脚質2分類に。頭数の前半なら逃げ先行。"""
-    return "逃げ先行" if last_corner <= field_size / 2 else "差し追込"
+        return f"馬場メモ: {label}は分析データなし"
+    if v.get("frame") and v.get("frame_dev") is not None:
+        memo = (f"馬場メモ: {label}は{v['frame']}枠グループが有利化"
+                f"(Δ{v['frame_dev']:+.2f})".replace("+", "+").replace("-", "−"))
+        if v.get("style"):
+            memo += f"、脚質は{v['style']}優位"
+        return memo
+    return f"馬場メモ: {label}はベースラインからの乖離なし"
 
 
 # ---------- netkeiba スクレイピング ----------
@@ -253,62 +278,6 @@ def fetch_race_meta(race_id: str) -> dict:
     }
 
 
-def fetch_last_run_styles(race_id: str) -> dict[str, str]:
-    """馬柱ページから各馬の前走脚質(逃げ先行/差し追込)を判定して返す。
-
-    返り値: {馬名: 脚質}。前走情報が取れない馬は含めない。
-    """
-    url = f"{NETKEIBA_BASE}/race/shutuba_past.html?race_id={race_id}"
-    html = fetch_html(url)
-    soup = BeautifulSoup(html, "html.parser")
-
-    # 馬柱本体のみ対象 (shutuba_meta と同様、展開予想テーブル等を除外)
-    table = soup.select_one("table.Shutuba_Past5_Table") or soup
-
-    styles: dict[str, str] = {}
-    for tr in table.select("tr.HorseList"):
-        name = _horse_name(tr)
-        if not name:
-            continue
-        past = tr.select("td[class*='Past']")
-        if not past:
-            continue
-        text = past[0].get_text(" ", strip=True)  # 先頭セル = 前走
-        field_m = re.search(r"(\d+)頭", text)
-        corner_m = re.search(r"\d+(?:-\d+){1,3}", text)
-        if not field_m or not corner_m:
-            continue
-        field_size = int(field_m.group(1))
-        last_corner = int(corner_m.group(0).split("-")[-1])
-        styles[name] = style_from_last_corner(last_corner, field_size)
-    return styles
-
-
-def match_bias_horses(
-    entries: list[dict],
-    last_styles: dict[str, str],
-    bias_frame: str | None,
-    bias_style: str | None,
-) -> list[str]:
-    """相対枠位置(内/中/外)と前走脚質が両方「来てる」側に一致する馬名を返す。
-    相対枠位置は出馬表の並び(=馬番順)で3等分する(集計側と同じ定義)。"""
-    if not bias_frame or not bias_style:
-        return []
-    n = len(entries)
-    if n == 0:
-        return []
-    matched: list[str] = []
-    for i, e in enumerate(entries):
-        p = (i + 1) / n
-        frame3 = "内" if p <= 1 / 3 + 1e-9 else ("中" if p <= 2 / 3 + 1e-9 else "外")
-        if frame3 != bias_frame:
-            continue
-        if last_styles.get(e["horse"]) != bias_style:
-            continue
-        matched.append(e["horse"])
-    return matched
-
-
 # ---------- 投稿 ----------
 def race_name_to_hashtag(race_name: str) -> str:
     cleaned = re.sub(r"[((].*?[))]", "", race_name)
@@ -323,28 +292,45 @@ def tweet_weight(text: str) -> int:
     return sum(1 if ord(c) < 0x1100 else 2 for c in text)
 
 
-def compose_tweet(
-    race_name: str,
-    course: str,
-    bias: str,
-    matched_horses: list[str],
-) -> str:
+def compose_pass_tweet(race_name: str, memo: str) -> str:
+    """前日ポスト(見送り)。分析レポート調。"""
     hashtag = race_name_to_hashtag(race_name)
-    head = [f"#{hashtag} のバイアスは...", f"「{bias}」"]
-    tail = ["", "詳しい集計データはツリーから"]
+    lines = [
+        f"#{hashtag} の期待値分析",
+        "",
+        "結論: 見送り",
+        f"オッズとモデルの見解差が基準(期待値{EV_THRESHOLD})に届く馬はいません。",
+        "",
+        memo,
+        "",
+        "全レースの分析はリプライから",
+    ]
+    body = "\n".join(lines)
+    if tweet_weight(body) > TWEET_LIMIT:
+        # 長すぎる場合は馬場メモを落とす
+        body = "\n".join(lines[:5] + lines[6:])
+    return body
 
-    if not matched_horses:
-        return "\n".join(head + tail)
 
-    # 原則 全頭表示。280を超える時だけ末尾から削って「、…」を付す。
-    shown = list(matched_horses)
-    while shown:
-        names = "、".join(shown) + ("、…" if shown != matched_horses else "")
-        body = "\n".join(head + ["", f"該当馬は{names}。"] + tail)
-        if tweet_weight(body) <= TWEET_LIMIT:
-            return body
-        shown.pop()
-    return "\n".join(head + tail)
+def compose_verify_tweet(dates: list[str], n_races: int, n_reco: int,
+                         n_hit: int, roi: float | None,
+                         bench_roi: float) -> str:
+    """結果検証ポスト(火曜)。"""
+    labels = "・".join(f"{int(d[4:6])}/{int(d[6:8])}" for d in dates)
+    lines = [f"週末の結果検証({labels})", ""]
+    if n_reco == 0:
+        lines.append(f"判断: 全{n_races}レースを見送り")
+    else:
+        lines.append(f"判断: 推奨{n_reco}頭(他は見送り)")
+        lines.append(
+            f"結果: 的中{n_hit}頭、単勝回収率{0 if roi is None else round(roi)}%")
+    lines += [
+        f"参考: 全馬に単勝100円を投じた場合の回収率は{round(bench_roi)}%",
+        "",
+        "「買わない」も検証可能な判断として記録しています。",
+        "詳細はリプライから",
+    ]
+    return "\n".join(lines)
 
 
 def write_step_summary(lines: list[str]) -> None:
@@ -379,6 +365,59 @@ def post_thread(text: str, reply_url: str) -> str:
     return main_id
 
 
+# ---------- 結果検証ポスト(火曜) ----------
+def run_verify(now_dt: datetime, dry_run: bool) -> int:
+    """直近7日の判断と結果を site.db / keiba.db から集計して投稿する。"""
+    since = (now_dt - timedelta(days=7)).strftime("%Y%m%d")
+    site = _site_db()
+
+    dates = [d for (d,) in site.execute(
+        "SELECT DISTINCT date FROM pred_horses"
+        " WHERE rank IS NOT NULL AND date >= ? ORDER BY date", (since,))]
+    if not dates:
+        log.info("直近7日に検証可能なデータなし。終了。")
+        write_step_summary(["### 検証投稿 0 件 — 直近7日に開催データなし(正常)"])
+        return 0
+
+    ph = ",".join("?" for _ in dates)
+    n_races = site.execute(
+        f"SELECT COUNT(*) FROM pred_races WHERE date IN ({ph})", dates,
+    ).fetchone()[0]
+    n_reco, n_hit, payout = site.execute(
+        f"SELECT COUNT(*), SUM(CASE WHEN rank = 1 THEN 1 ELSE 0 END),"
+        f" SUM(CASE WHEN rank = 1 THEN odds ELSE 0 END)"
+        f" FROM pred_horses WHERE recommended = 1 AND date IN ({ph})", dates,
+    ).fetchone()
+    n_reco, n_hit = n_reco or 0, n_hit or 0
+    roi = (payout or 0) / n_reco * 100 if n_reco else None
+
+    # 参考基準: 全出走馬に単勝100円を投じた場合の回収率(keiba.dbから)
+    keiba = sqlite3.connect(f"file:{KEIBA_DB_PATH}?mode=ro", uri=True)
+    n_all, ret_all = keiba.execute(
+        f"SELECT COUNT(*), SUM(CASE WHEN h.finish = 1 THEN h.win_odds ELSE 0 END)"
+        f" FROM results h JOIN races r ON r.race_id = h.race_id"
+        f" WHERE r.date IN ({ph}) AND r.surface IN ('芝','ダート')"
+        f" AND h.win_odds IS NOT NULL", dates,
+    ).fetchone()
+    bench_roi = (ret_all or 0) / n_all * 100 if n_all else 0.0
+
+    text = compose_verify_tweet(dates, n_races, n_reco, n_hit, roi, bench_roi)
+    log.info("検証投稿本文(重み%d):\n%s", tweet_weight(text), text)
+
+    if not dry_run:
+        post_thread(text, RESULT_URL)
+
+    write_step_summary([
+        "### 結果検証ポスト",
+        "",
+        "```",
+        text,
+        "```",
+        "DRY RUN(未投稿)" if dry_run else "✅ 投稿済み",
+    ])
+    return 0
+
+
 # ---------- メイン ----------
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="mamahuhu X auto-poster")
@@ -393,6 +432,11 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="実投稿せずログだけ出す (DRY_RUN=1 env と同等)",
+    )
+    p.add_argument(
+        "--verify",
+        action="store_true",
+        help="結果検証ポスト(火曜用): 直近週末の判断と回収率を投稿",
     )
     return p.parse_args()
 
@@ -409,6 +453,10 @@ def main() -> int:
         log.info("=== TEST: 実行日付を %s に上書き ===", args.date)
     else:
         now_dt = datetime.now(JST)
+
+    if args.verify:
+        return run_verify(now_dt, dry_run)
+
     target_dt = now_dt + timedelta(days=1)  # 翌日(=投稿対象)のレース
     log.info(
         "now=%s (%s) target=%s",
@@ -478,67 +526,40 @@ def main() -> int:
         try:
             time.sleep(SLEEP_BETWEEN_SCRAPE)
             meta = fetch_race_meta(race["race_id"])
-            jockeys = meta["jockeys"]
             surface = meta["surface"]
-            entries = meta["entries"]
             # 一覧の名前は短縮されることがあるので出馬表のフルネーム優先
             race_name = meta["race_name"] or race["race_name"]
-            log.info(
-                "%s: surface=%s, %d 頭 / 騎手 %s",
-                race["race_name"],
-                surface,
-                len(jockeys),
-                jockeys[:3],
-            )
+            log.info("%s: surface=%s", race_name, surface)
 
             data = data_cache.get(race["course"])
             if not data:
-                log.info(
-                    "%s: %s の過去開催データなし、スキップ",
-                    race["race_name"],
-                    race["course"],
-                )
-                outcomes.append(
-                    (race["course"], race["grade"], race_name,
-                     "スキップ: バイアスデータなし")
-                )
+                log.info("%s: %s のバイアス分析なし、スキップ",
+                         race_name, race["course"])
+                outcomes.append((race["course"], race["grade"], race_name,
+                                 "スキップ: バイアス分析なし"))
                 continue
             if not surface:
-                log.warning(
-                    "%s: 芝/ダート判定不可、スキップ", race["race_name"]
-                )
-                outcomes.append(
-                    (race["course"], race["grade"], race_name,
-                     "スキップ: 芝/ダート判定不可")
-                )
+                log.warning("%s: 芝/ダート判定不可、スキップ", race_name)
+                outcomes.append((race["course"], race["grade"], race_name,
+                                 "スキップ: 芝/ダート判定不可"))
                 continue
 
-            bias = derive_bias(data, surface)
-            if not bias:
-                log.info(
-                    "%s: %s はいつも通りの馬場(ズレなし)、スキップ",
-                    race["race_name"],
-                    surface,
-                )
-                outcomes.append(
-                    (race["course"], race["grade"], race_name,
-                     "スキップ: いつも通りの馬場")
-                )
-                continue
-
-            time.sleep(SLEEP_BETWEEN_SCRAPE)
-            last_styles = fetch_last_run_styles(race["race_id"])
+            # 見送り判定: 期待値の上界がオッズに依らず閾値未満であることを確認。
+            # 上界が閾値以上になった場合(将来の強いモデル)は、前日オッズを
+            # 取得しないと結論が出せないため投稿をスキップして警告する。
             v = data.get(surface) or {}
-            matched_horses = match_bias_horses(
-                entries, last_styles, v.get("frame"), v.get("style")
-            )
-            log.info("該当馬(枠%s/脚質%s): %s",
-                     v.get("frame"), v.get("style"), matched_horses)
+            bound = ev_upper_bound(v.get("max_x", 0.0))
+            if bound >= EV_THRESHOLD:
+                log.warning(
+                    "%s: 期待値上界%.3f≥閾値%.2f — 前日オッズが必要。投稿スキップ",
+                    race_name, bound, EV_THRESHOLD)
+                outcomes.append((race["course"], race["grade"], race_name,
+                                 f"⚠️ 要オッズ確認(上界{bound:.2f})"))
+                continue
 
-            text = compose_tweet(
-                race_name, race["course"], bias, matched_horses
-            )
-            log.info("投稿本文:\n%s", text)
+            memo = baba_memo(data, race["course"], surface)
+            text = compose_pass_tweet(race_name, memo)
+            log.info("投稿本文(重み%d):\n%s", tweet_weight(text), text)
 
             if not dry_run:
                 post_thread(text, MAMAHUHU_URL)
@@ -546,7 +567,7 @@ def main() -> int:
             posted += 1
             outcomes.append(
                 (race["course"], race["grade"], race_name,
-                 "DRY RUN(未投稿)" if dry_run else "✅ 投稿")
+                 "DRY RUN(未投稿)" if dry_run else "✅ 投稿(見送り宣言)")
             )
         except Exception as e:  # 1レース失敗しても他は続行
             log.exception("error on race %s: %s", race["race_name"], e)

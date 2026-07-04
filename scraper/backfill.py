@@ -201,6 +201,7 @@ def parse_race_page(html, race_id, yyyymmdd):
         "weather": weather,
         "track_condition": condition,
         "n_starters": n_starters,
+        "source": "db",
         "scraped_at": datetime.now().isoformat(timespec="seconds"),
     }
     return race, results

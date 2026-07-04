@@ -54,22 +54,23 @@ jobs:
       - name: Run scraper (weekend realtime)
         if: github.event.schedule == '0 9 * * SAT,SUN' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'weekend')
         run: |
-          # 当日分をrealtime取得。
-          # target_date を渡すことで scrape.py がリアルタイム側(race.netkeiba.com)
-          # を使う。db.netkeiba.com は当週分の反映が火曜頃なので当日はこちら。
+          # 当日分をrealtime取得(keiba.dbへ暫定品質で取り込み+notable更新)。
+          # その後 rebuild_site.py が当日ぶんの bias3/pred を site.db に生成する。
+          # realtime品質は火曜の rawdb 取り込み+再生成でdb品質に上書きされる。
           TARGET_DATE=$(TZ=Asia/Tokyo date +%Y%m%d)
           python scraper/scrape.py "$TARGET_DATE"
+          python scraper/rebuild_site.py --from "$TARGET_DATE"
 
       - name: Run scraper (db rebuild, manual)
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'rebuild'
         run: |
           # 手動rebuild: realtime取得が壊れた/取りこぼした時のfallback。
           # 前週末分(直近の土・日)を db.netkeiba.com から取り直して上書き。
-          # 現状はbias計算が両経路で同等なので定期実行は不要。
           SAT=$(TZ=Asia/Tokyo date -d '3 days ago' +%Y%m%d)
           SUN=$(TZ=Asia/Tokyo date -d '2 days ago' +%Y%m%d)
           python scraper/scrape.py "$SAT"
           python scraper/scrape.py "$SUN"
+          python scraper/rebuild_site.py --from "$SAT"
 
       - name: Run scraper (notable_race update)
         if: github.event.schedule == '0 9 * * FRI' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'notable')
@@ -82,9 +83,11 @@ jobs:
         if: github.event.schedule == '0 9 * * TUE' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'rawdb')
         run: |
           # 前週末(直近8日)の生データを db.netkeiba.com から data/keiba.db へ。
-          # 冪等(取得済みはスキップ)。長期ベースライン・予想モデルの材料。
+          # 週末のrealtime暫定行はdb品質で取り直され(existing_race_idsが除外)、
+          # 再生成で site.db 側も通過順・確定オッズ入りにアップグレードされる。
           FROM=$(TZ=Asia/Tokyo date -d '8 days ago' +%Y%m%d)
           python scraper/backfill.py --from "$FROM"
+          python scraper/rebuild_site.py --from "$FROM"
 
       - name: Commit and push
         run: |

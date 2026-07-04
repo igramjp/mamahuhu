@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS races (
     weather         TEXT,               -- 晴/曇/雨など
     track_condition TEXT,               -- 良/稍重/重/不良
     n_starters      INTEGER,            -- 出走頭数(取消・除外を除く)
+    source          TEXT NOT NULL DEFAULT 'db',  -- 'db' | 'realtime'(週末暫定)
     scraped_at      TEXT NOT NULL
 );
 
@@ -73,7 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_races_place ON races(place, date);
 RACE_COLS = [
     "race_id", "date", "place", "kai", "nichi", "race_no", "race_name",
     "surface", "distance", "turn", "course_note", "weather",
-    "track_condition", "n_starters", "scraped_at",
+    "track_condition", "n_starters", "source", "scraped_at",
 ]
 RESULT_COLS = [
     "race_id", "umaban", "wakuban", "finish", "finish_raw", "horse",
@@ -88,6 +89,12 @@ def connect(db_path=None):
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    # 既存DBへのマイグレーション: source列(2026-07追加)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(races)")}
+    if "source" not in cols:
+        with conn:
+            conn.execute(
+                "ALTER TABLE races ADD COLUMN source TEXT NOT NULL DEFAULT 'db'")
     return conn
 
 
@@ -122,8 +129,11 @@ def record_failure(conn, race_id, date, error):
 
 
 def existing_race_ids(conn):
-    """既に取得済みのrace_id集合(再開・スキップ判定用)。"""
-    return {row[0] for row in conn.execute("SELECT race_id FROM races")}
+    """db品質で取得済みのrace_id集合(再開・スキップ判定用)。
+    週末realtime取り込みぶん(source='realtime')は含めない =
+    火曜のバックフィルがdb品質で取り直して上書きする。"""
+    return {row[0] for row in conn.execute(
+        "SELECT race_id FROM races WHERE source = 'db'")}
 
 
 def dates_with_races(conn):

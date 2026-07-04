@@ -4,17 +4,26 @@ name: post-to-x
 # 元リポジトリの workflow は disabled_manually で停止済み。
 on:
   schedule:
-    # 金・土 20:00 JST = 金・土 11:00 UTC
-    # (mamahuhu.app の結果JSONが土日 18:00 に生成されるため、その後に投稿)
+    # 金・土 20:00 JST = 11:00 UTC: 前日ポスト(翌日重賞の期待値分析)
+    # 当日18:00のスクレイプ+再生成コミット後に走る
     - cron: "0 11 * * 5,6"
+    # 火 20:00 JST = 11:00 UTC: 結果検証ポスト(rawdb取り込み+再生成の後)
+    - cron: "0 11 * * 2"
   workflow_dispatch:
     inputs:
+      mode:
+        description: "投稿モード"
+        type: choice
+        default: preview
+        options:
+          - preview   # 前日ポスト
+          - verify    # 結果検証ポスト
       dry_run:
         description: "実投稿せずログだけ出す"
         type: boolean
         default: false
       date:
-        description: "テスト用: 実行日付を YYYYMMDD で上書き (例: 20260522)"
+        description: "テスト用: 実行日付を YYYYMMDD で上書き (例: 20260628)"
         type: string
         required: false
 
@@ -46,4 +55,9 @@ jobs:
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
           TZ: Asia/Tokyo
         run: |
-          python poster/post.py ${{ inputs.date && format('--date {0}', inputs.date) || '' }}
+          # 火曜スケジュール or mode=verify なら結果検証ポスト
+          MODE_FLAG=""
+          if [ "${{ github.event.schedule }}" = "0 11 * * 2" ] || [ "${{ inputs.mode }}" = "verify" ]; then
+            MODE_FLAG="--verify"
+          fi
+          python poster/post.py $MODE_FLAG ${{ inputs.date && format('--date {0}', inputs.date) || '' }}

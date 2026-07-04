@@ -138,7 +138,10 @@ def write_report(conn, data):
             (date, place, data.get("source"), data.get("generated_at"),
              data.get("total_races")))
 
-        write_notable(conn, date, place, data.get("notable_race"), _in_txn=True)
+        # notable_race はキーが存在する時だけ書き換える。キーが無い呼び出し
+        # (rebuild_site.py 等)では既存の notable を保持する。
+        if "notable_race" in data:
+            write_notable(conn, date, place, data.get("notable_race"), _in_txn=True)
 
 
 def write_notable(conn, date, place, nr, _in_txn=False):

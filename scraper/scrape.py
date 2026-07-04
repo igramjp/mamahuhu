@@ -18,6 +18,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+import db as keiba_db
 import site_db
 
 COURSE = {
@@ -39,6 +40,8 @@ REALTIME_COLMAP = {
     "枠": "枠番",
     "後3F": "上り",
     "コーナー通過順": "通過",
+    "単勝オッズ": "単勝",
+    "馬体重(増減)": "馬体重",
 }
 # target_date が今日からこの日数以内ならリアルタイム側を使う。
 # db.netkeiba.com の当週分は火曜前後まで反映されないため。
@@ -427,6 +430,98 @@ def find_latest_race_date(place, max_back=14):
     return None, []
 
 
+# ---------- keiba.db への生データ取り込み ----------
+def _to_int(v):
+    try:
+        return int(str(v).strip())
+    except (ValueError, TypeError):
+        return None
+
+
+def _to_float(v):
+    try:
+        return float(str(v).strip().replace(",", ""))
+    except (ValueError, TypeError):
+        return None
+
+
+def _cell(row, name):
+    v = row.get(name)
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return None
+    s = str(v).strip()
+    return s if s and s.lower() != "nan" else None
+
+
+def ingest_raw_day(df, place, yyyymmdd, source):
+    """スクレイプ済みdf(1場・全レース連結)を data/keiba.db にUPSERTする。
+    週末は source='realtime' の暫定品質(通過順・天候等が欠けうる)で入り、
+    火曜のバックフィル(db.existing_race_idsがrealtime行を除外)が
+    db品質で取り直して上書きする。当日夜のバイアス計算を可能にするのが目的。"""
+    conn = keiba_db.connect()
+    n = 0
+    for rid, g in df.groupby("race_id"):
+        first = g.iloc[0]
+        surface = str(_cell(first, "コース") or "")
+        distance = _to_int(_cell(first, "距離"))
+        if surface not in ("芝", "ダート", "障害") or distance is None:
+            continue
+        results = []
+        n_starters = 0
+        for _, row in g.iterrows():
+            umaban = _to_int(_cell(row, "馬番"))
+            if umaban is None:
+                continue
+            finish_raw = _cell(row, "着順")
+            finish = _to_int(finish_raw)
+            excluded = finish_raw is not None and any(
+                x in finish_raw for x in ("取", "除"))
+            if not excluded:
+                n_starters += 1
+            results.append({
+                "race_id": str(rid),
+                "umaban": umaban,
+                "wakuban": _to_int(_cell(row, "枠番")),
+                "finish": finish,
+                "finish_raw": finish_raw,
+                "horse": _cell(row, "馬名"),
+                "sex_age": _cell(row, "性齢"),
+                "weight_carried": _to_float(_cell(row, "斤量")),
+                "jockey": _cell(row, "騎手"),
+                "time": _cell(row, "タイム"),
+                "margin": _cell(row, "着差"),
+                "passing": _cell(row, "通過"),
+                "last3f": _to_float(_cell(row, "上り")),
+                "win_odds": _to_float(_cell(row, "単勝")),
+                "popularity": _to_int(_cell(row, "人気")),
+                "horse_weight": _cell(row, "馬体重"),
+            })
+        if not results:
+            continue
+        rid = str(rid)
+        race = {
+            "race_id": rid,
+            "date": yyyymmdd,
+            "place": place,
+            "kai": int(rid[6:8]),
+            "nichi": int(rid[8:10]),
+            "race_no": int(rid[10:12]),
+            "race_name": _cell(first, "レース名"),
+            "surface": surface,
+            "distance": distance,
+            "turn": None,          # realtime経路では未パース(火曜db取得で補完)
+            "course_note": None,
+            "weather": None,
+            "track_condition": _cell(first, "馬場"),
+            "n_starters": n_starters,
+            "source": source,
+            "scraped_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        keiba_db.upsert_race(conn, race, results)
+        n += 1
+    return n
+
+
 # ---------- 分析 ----------
 def derive_style(passing, n_horses):
     if pd.isna(passing) or passing == "":
@@ -584,6 +679,15 @@ def process_place(conn, place, target_date=None):
         return None
 
     df = pd.concat(dfs, ignore_index=True)
+
+    # 生データをkeiba.dbへ(当日夜のバイアス計算・予想検証の材料)。
+    # 失敗してもレポート生成は続行する。
+    try:
+        n_raw = ingest_raw_day(df, place, yyyymmdd, source=new_source)
+        print(f"[{place}] keiba.db取り込み: {n_raw}R (source={new_source})")
+    except Exception as e:
+        print(f"[{place}] keiba.db取り込み失敗(処理継続): {str(e)[:150]}")
+
     analysis = analyze_to_dict(df, place, yyyymmdd, source=new_source)
 
     nr = build_notable_race(yyyymmdd, place)
