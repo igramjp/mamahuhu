@@ -1,0 +1,52 @@
+name: post-to-x
+
+# mamahuhu-post リポジトリから統合(2026-07)。
+# 元リポジトリの workflow は disabled_manually で停止済み。
+#
+# ⚠️ schedule は Secrets (X_API_KEY 等4つ) をこのリポジトリに設定してから
+# 有効化すること。それまでは workflow_dispatch のみ。
+on:
+  # schedule:
+  #   # 金・土 20:00 JST = 金・土 11:00 UTC
+  #   # (mamahuhu.app の結果JSONが土日 18:00 に生成されるため、その後に投稿)
+  #   - cron: "0 11 * * 5,6"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "実投稿せずログだけ出す"
+        type: boolean
+        default: false
+      date:
+        description: "テスト用: 実行日付を YYYYMMDD で上書き (例: 20260522)"
+        type: string
+        required: false
+
+concurrency:
+  group: post-to-x
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run post.py
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+          TZ: Asia/Tokyo
+        run: |
+          python poster/post.py ${{ inputs.date && format('--date {0}', inputs.date) || '' }}
