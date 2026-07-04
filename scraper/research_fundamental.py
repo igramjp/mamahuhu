@@ -108,7 +108,8 @@ def load_runs(conn):
     df = pd.read_sql_query("""
         SELECT r.race_id, r.date, r.place, r.surface, r.distance,
                h.umaban, h.finish, h.win_odds, h.popularity, h.horse,
-               h.weight_carried, h.jockey, h.time, h.last3f, h.horse_weight
+               h.weight_carried, h.jockey, h.time, h.passing, h.last3f,
+               h.horse_weight
         FROM races r JOIN results h ON r.race_id = h.race_id
         WHERE r.surface IN ('芝','ダート') AND h.horse IS NOT NULL
         ORDER BY r.date, r.race_id, h.umaban
