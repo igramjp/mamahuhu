@@ -1449,3 +1449,10 @@ table.data-table.pred-table thead tr th:not(:first-child):not(:nth-child(2)) {
         gap: 4px 1.3em;
     }
 }
+
+/* 結果検証ページ内の長期検証記事(競馬は儲かるのか) */
+.reality-section {
+    width: 100%;
+    background: #fff;
+    padding: 8px 22px 40px;
+}

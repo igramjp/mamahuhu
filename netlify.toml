@@ -24,10 +24,11 @@
   to = "/result.html"
   status = 200
 
+# 旧URL(儲かるのか単独ページ → 結果検証に統合)
 [[redirects]]
   from = "/reality"
-  to = "/reality.html"
-  status = 200
+  to = "/result"
+  status = 301
 
 # キャッシュ設定: site.db(SQLite)は300秒。HTML/CSS/JSはファイル名固定のため
 # 毎回サーバに確認(未変更は304で軽量、変更時は即反映)させる。
