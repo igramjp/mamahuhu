@@ -5,7 +5,8 @@
 取得し、data/keiba.db の forward_races / forward_entries に保存する。
 
 用途:
-  1. 順方向の期待値計算 (predict.py --forward): 発走前にEV・注目馬を出す
+  1. 順方向の期待値計算 (predict.py --forward): 発走前にEV・注目馬を出す。
+     rebuild_site.py --forward がサイト(pred_* forward=1)へ公開する
   2. X前日ポストに注目馬の実名を載せる (poster/post.py)
   3. 前日オッズ vs 確定オッズの研究データ蓄積(スマートマネー検出の材料)
 

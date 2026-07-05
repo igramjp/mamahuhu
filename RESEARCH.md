@@ -79,13 +79,17 @@ python scraper/research_intraday.py    # 第5回
 # 前日オッズ・順方向予想
 python scraper/odds.py --date 20260711
 python scraper/predict.py 小倉 --date 20260711 --forward
+python scraper/rebuild_site.py --forward 20260711   # 発走前予想をsite.dbへ
 
 # 払戻の過去分バックフィル(お試し)
 python scraper/backfill.py --payouts-only --from 20240106 --to 20240107 --limit 5
 ```
 
-運用サイクル(全自動): 土日18時 scrape+rebuild+翌日オッズ → 金土20時 前日ポスト
-(注目馬実名入り) → 火18時 rawdb+払戻+rebuild → 火20時 検証ポスト → 金18時
-notable更新+翌日オッズ。
+運用サイクル(全自動): 金18時 notable更新+翌土曜オッズ+土曜分の順方向予想を
+サイト公開(土曜朝までに土曜の期待値分析が出る) → 金土20時 前日ポスト(注目馬
+実名入り) → 土日18時 scrape+rebuild+翌日オッズ+翌日分の順方向予想をサイト公開
+(日曜朝までに日曜分が出る) → 火18時 rawdb+払戻+rebuild → 火20時 検証ポスト。
+発走前の順方向予想(pred_races.forward=1)は、結果確定後の rebuild で
+確定オッズ版(forward=0)に丸ごと置き換わる。
 
 詳細な設計判断は `.claude/bias_analysis_spec.md` を参照。

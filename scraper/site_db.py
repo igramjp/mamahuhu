@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS pred_races (
     race_name TEXT, surface TEXT, distance INTEGER,
     verdict TEXT NOT NULL,       -- '推奨' | '見送り'
     model_version TEXT,          -- 例: 'proto-0(デモ・未学習)'
+    forward INTEGER NOT NULL DEFAULT 0,  -- 1=前日オッズ時点(発走前)の順方向予想
     PRIMARY KEY (date, place, race_no)
 );
 
@@ -105,6 +106,13 @@ CREATE TABLE IF NOT EXISTS pred_horses (
 );
 """
 
+# 後方互換の列追加(既存DBは CREATE TABLE IF NOT EXISTS では変わらないため)
+MIGRATIONS = [
+    # 発走前(前日オッズ)の順方向予想。結果確定後のrebuildで0の行に置き換わる
+    ("pred_races", "forward",
+     "ALTER TABLE pred_races ADD COLUMN forward INTEGER NOT NULL DEFAULT 0"),
+]
+
 TABLES = ["reports", "notable_races", "notable_entries",
           "bias3_stats", "bias3_meta", "bias3_notes",
           "pred_races", "pred_horses"]
@@ -115,6 +123,10 @@ def connect(db_path=None):
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.executescript(SCHEMA)
+    for table, column, ddl in MIGRATIONS:
+        cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
+        if column not in cols:
+            conn.execute(ddl)
     return conn
 
 
@@ -219,19 +231,22 @@ def write_bias3(conn, report):
                          (date, place, i, note))
 
 
-def write_predictions(conn, date, place, races):
+def write_predictions(conn, date, place, races, forward=False):
     """予想を pred_* テーブルへ書き込む(冪等)。
     races: [{race_no, race_name, surface, distance, verdict, model_version,
              horses: [{umaban, horse, jockey, odds, market_prob, model_prob,
-                       ev, recommended}]}]"""
+                       ev, recommended}]}]
+    forward=True は前日オッズ時点の発走前予想。同じ (date, place) への
+    確定版の書き込みで丸ごと置き換わる。"""
     with conn:
         for t in ("pred_races", "pred_horses"):
             conn.execute(f"DELETE FROM {t} WHERE date = ? AND place = ?", (date, place))
         for r in races:
             conn.execute(
-                "INSERT INTO pred_races VALUES (?,?,?,?,?,?,?,?)",
+                "INSERT INTO pred_races VALUES (?,?,?,?,?,?,?,?,?)",
                 (date, place, r["race_no"], r.get("race_name"), r.get("surface"),
-                 r.get("distance"), r["verdict"], r.get("model_version")))
+                 r.get("distance"), r["verdict"], r.get("model_version"),
+                 1 if forward else 0))
             for h in r.get("horses") or []:
                 conn.execute(
                     "INSERT INTO pred_horses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",

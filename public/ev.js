@@ -81,11 +81,16 @@ function placeSectionHtml(place, races) {
 function renderAll(date, items) {
   let html = "";
   let version = null;
+  let anyForward = false;
   for (const it of items) {
     const races = SiteDB.predictions(date, it.place);
     if (!races) continue;
     if (!version && races[0]) version = races[0].model_version;
+    if (races.some((r) => r.forward)) anyForward = true;
     html += placeSectionHtml(it.place, races);
+  }
+  if (anyForward) {
+    html = `<p class="yomi-note forward-note">⏱ <b>発走前の分析です。</b>単勝オッズは前日(前売り)時点のスナップショットで、当日のオッズ変動により市場確率・期待値は変わります。結果確定後、このページは確定オッズ版に更新されます。</p>` + html;
   }
   html += `<section class="section">
     <h2 class="section-head">定義</h2>

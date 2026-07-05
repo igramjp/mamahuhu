@@ -212,9 +212,6 @@ def main():
     if args.forward:
         if not args.date:
             ap.error("--forward には --date が必要です")
-        if args.export:
-            ap.error("--forward の site.db 書き込みは未対応"
-                     "(未確定レースのUI表示が未検証)")
         date, races = build_forward_predictions(conn, args.place, args.date)
     else:
         date, races = build_predictions(conn, args.place, args.date)
@@ -225,7 +222,8 @@ def main():
     if args.export:
         import site_db
         site_conn = site_db.connect()
-        site_db.write_predictions(site_conn, date, args.place, races)
+        site_db.write_predictions(site_conn, date, args.place, races,
+                                  forward=args.forward)
         n_reco = sum(1 for r in races if r["verdict"] == "推奨")
         print(f"export: {date}_{args.place} {len(races)}R (推奨{n_reco} / 見送り{len(races) - n_reco}) → site.db pred_*")
         return
