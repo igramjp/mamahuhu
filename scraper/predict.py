@@ -167,7 +167,7 @@ def build_forward_predictions(conn, place, target_date):
     EV・注目馬を計算する。オッズは前日(前売り)時点のもの。
     データが無ければ (None, None)。"""
     rows = conn.execute(
-        "SELECT race_id, race_no, race_name, surface, distance"
+        "SELECT race_id, race_no, race_name, surface, distance, snapped_at"
         " FROM forward_races WHERE date = ? AND place = ?"
         " AND surface IN ('芝','ダート') ORDER BY race_no",
         (target_date, place)).fetchall()
@@ -177,7 +177,7 @@ def build_forward_predictions(conn, place, target_date):
     deviations = _load_deviations(conn, place, target_date)
 
     races = []
-    for rid, race_no, race_name, surface, distance in rows:
+    for rid, race_no, race_name, surface, distance, snapped_at in rows:
         sub = pd.read_sql_query(
             "SELECT umaban, horse, jockey, win_odds AS odds"
             " FROM forward_entries WHERE race_id = ?"
@@ -190,9 +190,11 @@ def build_forward_predictions(conn, place, target_date):
             lambda p: "内" if p <= 1 / 3 + 1e-9
             else ("中" if p <= 2 / 3 + 1e-9 else "外"))
         sub["finish"] = None
-        races.append(_pack_race(
+        race = _pack_race(
             sub, deviations.get(surface, {}),
-            race_no, race_name, surface, distance))
+            race_no, race_name, surface, distance)
+        race["snapped_at"] = snapped_at   # オッズ取得時点(サイトの鮮度表示用)
+        races.append(race)
 
     races.sort(key=lambda r: r["race_no"])
     return target_date, races

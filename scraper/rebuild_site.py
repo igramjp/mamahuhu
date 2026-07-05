@@ -120,7 +120,7 @@ def rebuild_forward(target_date):
         if races:
             site_db.write_predictions(site, target_date, place, races, forward=True)
             n += len(races)
-            print(f"  {target_date} {place}: {len(races)}R (前日オッズ・発走前)")
+            print(f"  {target_date} {place}: {len(races)}R (発走前オッズ)")
     site.close()
     if n:
         compress_site_db()

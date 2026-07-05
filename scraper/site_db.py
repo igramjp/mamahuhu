@@ -86,7 +86,8 @@ CREATE TABLE IF NOT EXISTS pred_races (
     race_name TEXT, surface TEXT, distance INTEGER,
     verdict TEXT NOT NULL,       -- '推奨' | '見送り'
     model_version TEXT,          -- 例: 'proto-0(デモ・未学習)'
-    forward INTEGER NOT NULL DEFAULT 0,  -- 1=前日オッズ時点(発走前)の順方向予想
+    forward INTEGER NOT NULL DEFAULT 0,  -- 1=発売中オッズ時点(発走前)の順方向予想
+    snapped_at TEXT,             -- forward=1のオッズ取得時点(鮮度表示用)
     PRIMARY KEY (date, place, race_no)
 );
 
@@ -106,11 +107,14 @@ CREATE TABLE IF NOT EXISTS pred_horses (
 );
 """
 
-# 後方互換の列追加(既存DBは CREATE TABLE IF NOT EXISTS では変わらないため)
+# 後方互換の列追加(既存DBは CREATE TABLE IF NOT EXISTS では変わらないため)。
+# 列は必ず末尾に足す(INSERTが列名省略のため、SCHEMAと同順である必要がある)
 MIGRATIONS = [
-    # 発走前(前日オッズ)の順方向予想。結果確定後のrebuildで0の行に置き換わる
+    # 発走前(発売中オッズ)の順方向予想。結果確定後のrebuildで0の行に置き換わる
     ("pred_races", "forward",
      "ALTER TABLE pred_races ADD COLUMN forward INTEGER NOT NULL DEFAULT 0"),
+    ("pred_races", "snapped_at",
+     "ALTER TABLE pred_races ADD COLUMN snapped_at TEXT"),
 ]
 
 TABLES = ["reports", "notable_races", "notable_entries",
@@ -243,10 +247,10 @@ def write_predictions(conn, date, place, races, forward=False):
             conn.execute(f"DELETE FROM {t} WHERE date = ? AND place = ?", (date, place))
         for r in races:
             conn.execute(
-                "INSERT INTO pred_races VALUES (?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO pred_races VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (date, place, r["race_no"], r.get("race_name"), r.get("surface"),
                  r.get("distance"), r["verdict"], r.get("model_version"),
-                 1 if forward else 0))
+                 1 if forward else 0, r.get("snapped_at")))
             for h in r.get("horses") or []:
                 conn.execute(
                     "INSERT INTO pred_horses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",

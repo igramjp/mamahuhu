@@ -1,16 +1,19 @@
 """
-前日オッズパイプライン。
+発走前オッズパイプライン。
 
-翌日(または指定日)の全JRAレースについて、出馬表と前売り単勝オッズを
+翌日(または指定日)の全JRAレースについて、出馬表と発売中の単勝オッズを
 取得し、data/keiba.db の forward_races / forward_entries に保存する。
+再実行すると forward_entries は最新値に置き換わり、置き換え前の各時点は
+forward_odds_history に残る(前日夜→当日朝の変動が追える)。
 
 用途:
   1. 順方向の期待値計算 (predict.py --forward): 発走前にEV・注目馬を出す。
      rebuild_site.py --forward がサイト(pred_* forward=1)へ公開する
   2. X前日ポストに注目馬の実名を載せる (poster/post.py)
-  3. 前日オッズ vs 確定オッズの研究データ蓄積(スマートマネー検出の材料)
+  3. 前日vs当日朝vs確定オッズの研究データ蓄積(スマートマネー検出の材料)
 
-GitHub Actions想定: 金曜18時(翌土曜ぶん)・土日18時(翌日ぶん)。
+GitHub Actions想定: 金曜18時(翌土曜ぶん)・土日18時(翌日ぶん)・
+土日朝8時(当日ぶんを再取得して予想を更新)。
 月曜開催なし等でレースが見つからない日は何もせず正常終了する。
 
 使い方:
@@ -201,12 +204,12 @@ def snapshot_date(yyyymmdd):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="前日オッズスナップショット")
+    ap = argparse.ArgumentParser(description="発走前オッズスナップショット")
     ap.add_argument("--date", default=None,
                     help="対象日 YYYYMMDD (既定: 翌日JST)")
     args = ap.parse_args()
     target = args.date or (date.today() + timedelta(days=1)).strftime("%Y%m%d")
-    print(f"前日オッズスナップショット: {target}")
+    print(f"発走前オッズスナップショット: {target}")
     n = snapshot_date(target)
     print(f"完了: {n}R")
 

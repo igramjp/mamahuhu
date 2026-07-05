@@ -6,6 +6,10 @@ on:
     # 最終Rが16:30前後で終わってから1時間〜90分後。realtime/dbともに脚質は
     # 前走から算出するため、bias計算は同じ結果になる。
     - cron: '0 9 * * SAT,SUN'
+    # 土日朝8時JST = 金土23:00 UTC → 当日オッズを再取得して順方向予想を更新。
+    # cronは30〜67分遅れて発火するのが常なので、実際は8:30〜9:10頃
+    # (1R発走9:50前後に間に合う)。前日夜のスナップショットは履歴に退避される。
+    - cron: '0 23 * * FRI,SAT'
     # 金曜18時JST = 金曜09:00 UTC → 直近開催日(=前週日曜)の notable_race のみ
     # 埋め直し。日曜scrape時点では翌週末の出馬表が未公開で None のままなので、
     # 翌日(土)の出馬表が出揃った金曜夕方に取得する。
@@ -16,6 +20,7 @@ on:
     - cron: '0 9 * * TUE'
   # 手動実行: mode=weekend(当日realtime)/rebuild(前週末をdbで取り直し)
   #          /notable(翌週末出馬表)/rawdb(keiba.dbへ前週末取り込み)
+  #          /morning(当日オッズで順方向予想を更新。月曜祝日開催の朝にも使う)
   # 月曜祝日開催等は weekend、realtime取得が壊れた場合は rebuild。
   workflow_dispatch:
     inputs:
@@ -29,12 +34,16 @@ on:
           - rebuild
           - notable
           - rawdb
+          - morning
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      # snapped_at 等のタイムスタンプをJSTで刻む(サイトの鮮度表示に使う)
+      TZ: Asia/Tokyo
 
     steps:
       - name: Checkout
@@ -67,6 +76,16 @@ jobs:
           # 翌日(日曜)の順方向予想をサイトへ(発走前の期待値分析)。
           # これで日曜朝までに日曜分が公開される。翌日開催なしなら何もしない。
           python scraper/rebuild_site.py --forward "$TOMORROW" || echo "順方向予想の生成失敗(継続)"
+
+      - name: Refresh same-day odds and forward predictions (weekend morning)
+        if: github.event.schedule == '0 23 * * FRI,SAT' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'morning')
+        run: |
+          # 当日朝のオッズを再取得して順方向予想を更新する(オッズ変動の反映)。
+          # 前日夜のスナップショットは forward_odds_history に退避されるので
+          # 前日vs当日朝vs確定オッズの変動研究データは失われない。
+          TODAY=$(TZ=Asia/Tokyo date +%Y%m%d)
+          python scraper/odds.py --date "$TODAY"
+          python scraper/rebuild_site.py --forward "$TODAY"
 
       - name: Run scraper (db rebuild, manual)
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'rebuild'

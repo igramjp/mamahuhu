@@ -82,15 +82,25 @@ function renderAll(date, items) {
   let html = "";
   let version = null;
   let anyForward = false;
+  let snappedAt = null;
   for (const it of items) {
     const races = SiteDB.predictions(date, it.place);
     if (!races) continue;
     if (!version && races[0]) version = races[0].model_version;
-    if (races.some((r) => r.forward)) anyForward = true;
+    for (const r of races) {
+      if (!r.forward) continue;
+      anyForward = true;
+      if (r.snapped_at && (!snappedAt || r.snapped_at > snappedAt)) {
+        snappedAt = r.snapped_at;
+      }
+    }
     html += placeSectionHtml(it.place, races);
   }
   if (anyForward) {
-    html = `<p class="yomi-note forward-note">⏱ <b>発走前の分析です。</b>単勝オッズは前日(前売り)時点のスナップショットで、当日のオッズ変動により市場確率・期待値は変わります。結果確定後、このページは確定オッズ版に更新されます。</p>` + html;
+    // snapped_at: "2026-07-05T08:31:02" → "07/05 08:31"
+    const m = snappedAt && snappedAt.match(/\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    const when = m ? `${m[1]}/${m[2]} ${m[3]}:${m[4]}時点の発売中オッズ` : "発売中オッズのスナップショット";
+    html = `<p class="yomi-note forward-note">⏱ <b>発走前の分析です。</b>単勝オッズは${when}で、以降のオッズ変動により市場確率・期待値は変わります(前日夜に公開し、当日朝に更新)。結果確定後、このページは確定オッズ版に更新されます。</p>` + html;
   }
   html += `<section class="section">
     <h2 class="section-head">定義</h2>

@@ -95,6 +95,18 @@ CREATE TABLE IF NOT EXISTS forward_entries (
     PRIMARY KEY (race_id, umaban)
 );
 
+-- オッズスナップショット履歴(append-only)。forward_entries は再取得のたび
+-- 最新値に置き換わるため、前日夜→当日朝の各時点はこちらに残す
+-- (前日vs当日朝vs確定オッズの変動・スマートマネー研究の材料)。
+CREATE TABLE IF NOT EXISTS forward_odds_history (
+    race_id    TEXT NOT NULL,
+    umaban     INTEGER NOT NULL,
+    snapped_at TEXT NOT NULL,
+    win_odds   REAL,
+    popularity INTEGER,
+    PRIMARY KEY (race_id, umaban, snapped_at)
+);
+
 -- 払戻(全券種)。複雑券種の歪み研究(単勝確率→Harville式の三連系価格付けと
 -- 実払戻の突合)の材料。火曜のバックフィル(db.netkeibaページ)から取り込む。
 CREATE TABLE IF NOT EXISTS payouts (
@@ -182,13 +194,24 @@ def upsert_payouts(conn, race_id, rows):
 
 
 def upsert_forward(conn, race, entries):
-    """前日スナップショット1レース分をUPSERT(再実行で最新に置き換え)。"""
+    """オッズスナップショット1レース分をUPSERT(再実行で最新に置き換え)。
+    置き換え前の行と新しい行は forward_odds_history にも残す
+    (前日夜→当日朝の変動が全時点追える)。"""
     with conn:
         _upsert(conn, "forward_races", FWD_RACE_COLS, race)
+        conn.execute(
+            "INSERT OR IGNORE INTO forward_odds_history"
+            " (race_id, umaban, snapped_at, win_odds, popularity)"
+            " SELECT race_id, umaban, snapped_at, win_odds, popularity"
+            "   FROM forward_entries WHERE race_id = ?", (race["race_id"],))
         conn.execute("DELETE FROM forward_entries WHERE race_id = ?",
                      (race["race_id"],))
         for e in entries:
             _upsert(conn, "forward_entries", FWD_ENTRY_COLS, e)
+            conn.execute(
+                "INSERT OR IGNORE INTO forward_odds_history VALUES (?,?,?,?,?)",
+                (e["race_id"], e["umaban"], e["snapped_at"],
+                 e.get("win_odds"), e.get("popularity")))
 
 
 def record_failure(conn, race_id, date, error):
