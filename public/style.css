@@ -446,6 +446,7 @@ table.data-table {
     height: auto;
     border-collapse: collapse;
     border-spacing: 0;
+    margin-bottom: 16px;
 }
 
 table.data-table thead tr:first-child {
@@ -1341,6 +1342,7 @@ table.data-table.pred-table thead tr th:not(:first-child):not(:nth-child(2)) {
 .verify-kind-cell {
     text-align: right;
 }
+
 /* ===== 判定の内訳(レース単位の根拠開示)と現実セクション ===== */
 .pred-basis {
     font-size: 0.78em;
