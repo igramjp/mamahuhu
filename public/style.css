@@ -891,6 +891,8 @@ table.data-table.notable-race-table tbody tr td.horse-chips-cell .chips {
 }
 
 .yomi-note {
+    width: 100%;
+    max-width: 660px;
     background: #fdf3e7;
     border-radius: 6px;
     font-size: 0.85em;
