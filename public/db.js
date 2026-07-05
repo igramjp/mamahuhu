@@ -231,6 +231,47 @@
       "SELECT DISTINCT date, place FROM pred_races ORDER BY date DESC, place ASC");
   }
 
+  // 累計統計: 「歪みは見つかっているか」を数字で示す(現実セクション用)。
+  // 確定オッズ版(forward=0)のみ対象。performance系はrank判明分のみ。
+  function predStats() {
+    const total = rows(
+      `SELECT COUNT(*) n_races,
+              COALESCE(SUM(verdict = '推奨'), 0) n_reco_races,
+              MIN(date) date_from, MAX(date) date_to,
+              COUNT(DISTINCT date) n_days
+       FROM pred_races WHERE forward = 0`)[0];
+    const attn = rows(
+      `SELECT COUNT(*) n, COALESCE(SUM(rank = 1), 0) hits,
+              COALESCE(SUM(CASE WHEN rank = 1 THEN odds ELSE 0 END), 0) payout
+       FROM pred_horses WHERE attention = 1 AND rank IS NOT NULL`)[0];
+    const reco = rows(
+      `SELECT COUNT(*) n, COALESCE(SUM(rank = 1), 0) hits,
+              COALESCE(SUM(CASE WHEN rank = 1 THEN odds ELSE 0 END), 0) payout
+       FROM pred_horses WHERE recommended = 1 AND rank IS NOT NULL`)[0];
+    const roi = (s) => (s.n ? (s.payout / s.n) * 100 : null);
+    return {
+      total,
+      attn: { ...attn, roi: roi(attn) },
+      reco: { ...reco, roi: roi(reco) },
+    };
+  }
+
+  // 最新の予想日の推奨レース(バイアスページの「期待値分析との接続」用)
+  function latestRecoRaces() {
+    const d = rows("SELECT MAX(date) d FROM pred_races")[0];
+    if (!d || !d.d) return { date: null, races: [] };
+    const races = rows(
+      `SELECT * FROM pred_races WHERE date = ? AND verdict = '推奨'
+       ORDER BY place, race_no`, [d.d]);
+    for (const r of races) {
+      r.horses = rows(
+        `SELECT * FROM pred_horses
+         WHERE date = ? AND place = ? AND race_no = ? AND recommended = 1
+         ORDER BY ev DESC`, [d.d, r.place, r.race_no]);
+    }
+    return { date: d.d, races };
+  }
+
   function predictions(date, place) {
     const races = rows(
       `SELECT * FROM pred_races WHERE date = ? AND place = ? ORDER BY race_no`,
@@ -248,6 +289,7 @@
   window.SiteDB = {
     open, indexItems, report,
     bias3, favoredGroup, predItems, predictions,
+    predStats, latestRecoRaces,
     verify, verifyDates,
   };
 })();

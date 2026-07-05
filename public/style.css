@@ -191,7 +191,8 @@ footer {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 0.9375em;
+    flex-wrap: wrap;
+    gap: 8px 0.9375em;
     margin-bottom: 11px;
 }
 
@@ -1341,4 +1342,67 @@ table.data-table.pred-table thead tr th:not(:first-child):not(:nth-child(2)) {
 
 .verify-kind-cell {
     text-align: right;
+}
+/* ===== 判定の内訳(レース単位の根拠開示)と現実セクション ===== */
+.pred-basis {
+    font-size: 0.78em;
+    color: #5f5f5f;
+    line-height: 1.9;
+    background: #faf9f7;
+    border-left: 3px solid #d8d5cf;
+    border-radius: 0 4px 4px 0;
+    padding: 8px 12px;
+    margin: 10px 0 2px;
+}
+
+.frame3-mini {
+    display: inline-block;
+    font-size: 0.72em;
+    color: #767676;
+    border: 1px solid #d8d5cf;
+    border-radius: 3px;
+    line-height: 1.5;
+    padding: 0 4px;
+    margin-left: 6px;
+    vertical-align: 1px;
+}
+
+.reality-panel {
+    background: #fbfaf8;
+}
+
+.reality-lead {
+    font-size: 0.9em;
+    line-height: 1.9;
+    margin-bottom: 14px;
+}
+
+.reality-stats {
+    display: flex;
+    gap: 10px;
+    margin: 14px 0 6px;
+    flex-wrap: wrap;
+}
+
+.reality-stat {
+    flex: 1 1 140px;
+    text-align: center;
+    border: 1px solid #e0dfdb;
+    border-radius: 6px;
+    padding: 12px 8px 10px;
+    background: #fff;
+}
+
+.reality-stat b {
+    display: block;
+    font-size: 1.5em;
+    font-family: "Noto Sans JP", sans-serif;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 4px;
+}
+
+.reality-stat span {
+    font-size: 0.72em;
+    color: #767676;
+    line-height: 1.5;
 }

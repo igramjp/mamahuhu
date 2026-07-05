@@ -147,63 +147,73 @@ function surfaceBlockHtml(place, surface, b3s, notes) {
   return html + `</div>`;
 }
 
-// ---- 注目レース ----
-function entryFrame3(entries) {
-  const sorted = [...entries].sort((a, b) => a["馬番"] - b["馬番"]);
-  const n = sorted.length;
-  const map = {};
-  sorted.forEach((e, i) => {
-    const p = (i + 1) / n;
-    map[e["馬番"]] = p <= 1 / 3 + 1e-9 ? "内" : p <= 2 / 3 + 1e-9 ? "中" : "外";
-  });
-  return map;
-}
+// ---- 期待値分析との接続 ----
+// このページの乖離Δは翌開催の期待値モデルの入力。推奨が出たレースは
+// ここに裏付け(市場確率→モデル確率→期待値の鎖)を明示し、推奨ゼロなら
+// 「歪みはオッズに織り込み済み」という検証結果をそのまま示す。
+function evConnectionHtml() {
+  let latest, stats;
+  try {
+    latest = SiteDB.latestRecoRaces();
+    stats = SiteDB.predStats();
+  } catch (e) {
+    return "";
+  }
+  if (!latest.date) return "";
+  const t = stats.total;
 
-function notableRaceHtml(nr, bias3data) {
-  if (!nr || !nr.entries || nr.entries.length === 0) return "";
-  const b3s = bias3data && bias3data.surfaces && bias3data.surfaces[nr.surface];
-  const favFrame = b3s ? SiteDB.favoredGroup(b3s.frame) : null;
-  const favStyle = b3s ? SiteDB.favoredGroup(b3s.style) : null;
-  const frame3Map = entryFrame3(nr.entries);
-  const meta = SURFACE_META[nr.surface] || { cls: "" };
-  const dateLabel = nr.date ? formatDateWithDow(nr.date) : "";
-  const raceNameHtml = nr.race_name
-    ? `<span class="notable-race-name">${nr.race_name}</span>`
-    : "";
+  const intro = `<p class="section-sub">上の乖離Δは、翌開催の期待値モデルの唯一の入力になる(市場確率の対数オッズに −β×Δ を加点、β=0.5)。ここの数字が「買える歪み」なら、期待値分析に推奨として現れる。</p>`;
 
-  let rows = "";
-  for (const e of nr.entries) {
-    const chips = [];
-    const frameHit = favFrame && frame3Map[e["馬番"]] === favFrame;
-    const styleHit = favStyle && e["脚質"] === favStyle;
-    if (frameHit && styleHit) {
-      chips.push(`<span class="chip chip-hit">${favFrame}枠</span>`);
-      chips.push(`<span class="chip chip-hit">${e["脚質"]}</span>`);
-    }
-    const chipsHtml =
-      chips.length > 0 ? `<div class="chips">${chips.join("")}</div>` : "";
-    rows += `<tr>
-      <td class="horse-num-cell"><span class="horse-num">${e["馬番"]}</span></td>
-      <td class="horse-name-cell">${e["馬名"]}</td>
-      <td class="horse-jockey-cell">${e["騎手"] || ""}</td>
-      <td class="horse-chips-cell">${chipsHtml}</td>
-    </tr>`;
+  if (!latest.races.length) {
+    const cum = t && t.n_races
+      ? `2024年1月以降の累計では、${t.n_races.toLocaleString()}レースを検証して期待値1.1を超えた推奨は<b>${t.n_reco_races}件</b>。`
+      : "";
+    const attn = stats.attn && stats.attn.n
+      ? `モデルが市場より高く評価した「注目馬」${stats.attn.n}頭の実測単勝回収率は<b>${stats.attn.roi.toFixed(0)}%</b>(損益分岐は100%)。`
+      : "";
+    return `<section class="section panel reality-panel">
+      <h2 class="section-head">このバイアスは、儲けに変わるか</h2>
+      ${intro}
+      <p class="reality-lead">直近の期待値分析(${formatDateWithDow(latest.date)})の答えは<b>ノー</b> — 推奨0レース。${cum}${attn}</p>
+      <p class="yomi-foot">つまり、このページで観測される枠順バイアスは実在するが、その大半はすでにオッズに織り込まれており、控除率(約20%)の壁を超える余地を残していない。バイアスの検証記録と、それが馬券のプラスに変わらないという検証結果を、両方そのまま公開している。</p>
+      <div class="link-button"><a href="index.html"><span>期待値分析を見る</span></a></div>
+    </section>`;
   }
 
-  return `<section class="section panel notable-section">
-    <h2 class="section-head">次開催: ${nr.race_name || "メインレース"}</h2>
-    <p class="section-sub">直近推定バイアス(有利化グループ)に枠・脚質の両方が該当する出走馬をマーク。</p>
-    <div class="notable-race-head">
-      <span class="surface-tag ${meta.cls}">${nr.surface || ""}</span>
-      ${raceNameHtml}
-      <span class="notable-meta">${dateLabel} 11R</span>
-    </div>
-    <table class="data-table notable-race-table"><tbody>${rows}</tbody></table>
+  let rows = "";
+  for (const r of latest.races) {
+    let devStr = "";
+    try {
+      const a = r.analysis ? JSON.parse(r.analysis) : null;
+      const devs = (a && a.deviations) || {};
+      devStr = ["内", "中", "外"].filter((g) => devs[g] != null)
+        .map((g) => `${g}Δ${(devs[g] < 0 ? "−" : "+") + Math.abs(devs[g]).toFixed(3)}`)
+        .join(" ");
+    } catch (e) { /* 内訳なし */ }
+    for (const h of r.horses) {
+      rows += `<tr>
+        <td>${r.place}${r.race_no}R</td>
+        <td class="horse-name-cell">${h.horse || ""} <small>(${h.frame3 || "?"})</small></td>
+        <td class="num-cell">${h.odds ?? "-"}</td>
+        <td class="num-cell">${(h.market_prob * 100).toFixed(1)}%→${(h.model_prob * 100).toFixed(1)}%</td>
+        <td class="num-cell">${h.ev.toFixed(2)}</td>
+        <td><small>${devStr}</small></td>
+      </tr>`;
+    }
+  }
+  return `<section class="section panel reality-panel">
+    <h2 class="section-head">期待値分析の推奨 ${latest.races.length}レース(${formatDateWithDow(latest.date)})</h2>
+    ${intro}
+    <table class="data-table"><thead><tr>
+      <th>レース</th><th>推奨馬(枠位置)</th><th>オッズ</th><th>市場→モデル</th><th>期待値</th><th>使用した乖離</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <p class="yomi-foot">推奨は「前開催で観測した枠位置グループの乖離が、オッズに織り込まれていない」とモデルが判断した稀なケース。詳細な判定の内訳は期待値分析ページの各レース欄。</p>
+    <div class="link-button"><a href="index.html"><span>期待値分析で詳細を見る</span></a></div>
   </section>`;
 }
 
 // ---- ページ全体: 全場をスクロールで縦に並べる ----
-function renderAll(items, dataByKey, bias3ByKey) {
+function renderAll(items, dataByKey, bias3ByKey, isLatest) {
   const root = $("#report");
   let html = "";
 
@@ -220,8 +230,11 @@ function renderAll(items, dataByKey, bias3ByKey) {
         ${surfaceBlockHtml(it.place, surface, b3s, b3.notes)}
       </section>`;
     }
+  }
 
-    html += notableRaceHtml(data.notable_race, b3);
+  // 最新日の表示にだけ、直近の期待値分析との接続を載せる
+  if (html && isLatest) {
+    html += evConnectionHtml();
   }
 
   if (!html) {
@@ -283,7 +296,7 @@ async function init() {
   $("#date-display").textContent =
     `${formatDateWithDow(targetDate)} 開催のトラックバイアス分析`;
 
-  renderAll(items, dataByKey, bias3ByKey);
+  renderAll(items, dataByKey, bias3ByKey, targetDate === availableDates[0]);
 }
 
 function formatDateWithDow(yyyymmdd) {

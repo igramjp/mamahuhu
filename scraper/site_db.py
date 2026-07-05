@@ -16,6 +16,7 @@
 表示に使わない行は保存しない。
 """
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -88,6 +89,8 @@ CREATE TABLE IF NOT EXISTS pred_races (
     model_version TEXT,          -- 例: 'proto-0(デモ・未学習)'
     forward INTEGER NOT NULL DEFAULT 0,  -- 1=発売中オッズ時点(発走前)の順方向予想
     snapped_at TEXT,             -- forward=1のオッズ取得時点(鮮度表示用)
+    analysis TEXT,               -- 判定根拠JSON {deviations, beta, ev_threshold,
+                                 --   overround, max_ev, max_ev_umaban, prev_date, ...}
     PRIMARY KEY (date, place, race_no)
 );
 
@@ -103,6 +106,7 @@ CREATE TABLE IF NOT EXISTS pred_horses (
     recommended INTEGER NOT NULL DEFAULT 0,
     attention   INTEGER NOT NULL DEFAULT 0,  -- 注目馬(市場比+2%以上の最上位)
     rank        INTEGER,         -- 確定着順(結果判明後。未確定はNULL)
+    frame3      TEXT,            -- 相対枠位置グループ 内/中/外(補正の根拠表示用)
     PRIMARY KEY (date, place, race_no, umaban)
 );
 """
@@ -115,6 +119,10 @@ MIGRATIONS = [
      "ALTER TABLE pred_races ADD COLUMN forward INTEGER NOT NULL DEFAULT 0"),
     ("pred_races", "snapped_at",
      "ALTER TABLE pred_races ADD COLUMN snapped_at TEXT"),
+    ("pred_races", "analysis",
+     "ALTER TABLE pred_races ADD COLUMN analysis TEXT"),
+    ("pred_horses", "frame3",
+     "ALTER TABLE pred_horses ADD COLUMN frame3 TEXT"),
 ]
 
 TABLES = ["reports", "notable_races", "notable_entries",
@@ -246,19 +254,22 @@ def write_predictions(conn, date, place, races, forward=False):
         for t in ("pred_races", "pred_horses"):
             conn.execute(f"DELETE FROM {t} WHERE date = ? AND place = ?", (date, place))
         for r in races:
+            analysis = r.get("analysis")
             conn.execute(
-                "INSERT INTO pred_races VALUES (?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO pred_races VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (date, place, r["race_no"], r.get("race_name"), r.get("surface"),
                  r.get("distance"), r["verdict"], r.get("model_version"),
-                 1 if forward else 0, r.get("snapped_at")))
+                 1 if forward else 0, r.get("snapped_at"),
+                 json.dumps(analysis, ensure_ascii=False) if analysis else None))
             for h in r.get("horses") or []:
                 conn.execute(
-                    "INSERT INTO pred_horses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO pred_horses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (date, place, r["race_no"], h["umaban"], h.get("horse"),
                      h.get("jockey"), h.get("odds"), h.get("market_prob"),
                      h.get("model_prob"), h.get("ev"), h.get("edge"),
                      1 if h.get("recommended") else 0,
-                     1 if h.get("attention") else 0, h.get("rank")))
+                     1 if h.get("attention") else 0, h.get("rank"),
+                     h.get("frame3")))
 
 
 if __name__ == "__main__":

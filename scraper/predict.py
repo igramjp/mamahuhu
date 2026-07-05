@@ -42,8 +42,8 @@ def _prev_kaisai_date(conn, place, target_date):
 
 
 def _load_deviations(conn, place, target_date):
-    """前開催日の枠バイアス deviation を {surface: {grp: dev}} で返す
-    (リーク防止: target_date 当日の結果は使わない)。"""
+    """前開催日の枠バイアス deviation を (prev_date, {surface: {grp: dev}})
+    で返す(リーク防止: target_date 当日の結果は使わない)。"""
     prev_date = _prev_kaisai_date(conn, place, target_date)
     bias_report = build_bias_report(conn, place, prev_date) if prev_date else None
     deviations = {}
@@ -53,7 +53,7 @@ def _load_deviations(conn, place, target_date):
             if fb:
                 deviations[surface] = {
                     g["group"]: (g.get("deviation") or 0.0) for g in fb["groups"]}
-    return deviations
+    return prev_date, deviations
 
 
 def _pack_race(sub, dev, race_no, race_name, surface, distance):
@@ -97,9 +97,26 @@ def _pack_race(sub, dev, race_no, race_name, surface, distance):
         "recommended": bool(r.recommended),
         "attention": int(r.umaban) == attention_umaban,
         "rank": int(r.finish) if pd.notna(r.finish) else None,
+        "frame3": r.frame3,
     } for r in sub.itertuples()]
 
     n_reco = sum(1 for h in horses if h["recommended"])
+
+    # 判定根拠(サイトの「分析の内訳」表示用)。
+    # overround = Σ1/オッズ。1を超えるぶんが実質控除率(スナップショット時点)
+    best = max(horses, key=lambda h: h["ev"])
+    analysis = {
+        "deviations": {g: round(d, 4) for g, d in dev.items()},
+        "beta": BETA,
+        "ev_threshold": EV_THRESHOLD,
+        "attention_floor": ATTENTION_FLOOR,
+        "n_horses": len(horses),
+        "overround": round(float((1.0 / sub["odds"]).sum()), 3),
+        "max_ev": best["ev"],
+        "max_ev_umaban": best["umaban"],
+        "max_edge": round(float(sub["edge"].max()), 4),
+    }
+
     horses.sort(key=lambda h: (-h["edge"], -h["model_prob"]))
     # site.dbのサイズ抑制: 表示に使う行(推奨馬・注目馬 + 上位3頭)だけ保存
     horses = [h for i, h in enumerate(horses)
@@ -112,6 +129,7 @@ def _pack_race(sub, dev, race_no, race_name, surface, distance):
         "verdict": "推奨" if n_reco else "見送り",
         "model_version": MODEL_VERSION,
         "horses": horses,
+        "analysis": analysis,
     }
 
 
@@ -124,7 +142,7 @@ def build_predictions(conn, place, target_date=None):
         if target_date is None:
             return None, None
 
-    deviations = _load_deviations(conn, place, target_date)
+    prev_date, deviations = _load_deviations(conn, place, target_date)
 
     day = load_horses(conn, place=place, date_eq=target_date)
     if day.empty:
@@ -153,9 +171,11 @@ def build_predictions(conn, place, target_date=None):
 
         race_name = conn.execute(
             "SELECT race_name FROM races WHERE race_id = ?", (rid,)).fetchone()[0]
-        races.append(_pack_race(
+        race = _pack_race(
             sub, deviations.get(meta["surface"], {}),
-            int(str(rid)[-2:]), race_name, meta["surface"], meta["distance"]))
+            int(str(rid)[-2:]), race_name, meta["surface"], meta["distance"])
+        race["analysis"]["prev_date"] = prev_date
+        races.append(race)
 
     races.sort(key=lambda r: r["race_no"])
     return target_date, races
@@ -174,7 +194,7 @@ def build_forward_predictions(conn, place, target_date):
     if not rows:
         return None, None
 
-    deviations = _load_deviations(conn, place, target_date)
+    prev_date, deviations = _load_deviations(conn, place, target_date)
 
     races = []
     for rid, race_no, race_name, surface, distance, snapped_at in rows:
@@ -194,6 +214,7 @@ def build_forward_predictions(conn, place, target_date):
             sub, deviations.get(surface, {}),
             race_no, race_name, surface, distance)
         race["snapped_at"] = snapped_at   # オッズ取得時点(サイトの鮮度表示用)
+        race["analysis"]["prev_date"] = prev_date
         races.append(race)
 
     races.sort(key=lambda r: r["race_no"])
