@@ -24,6 +24,11 @@
   to = "/result.html"
   status = 200
 
+[[redirects]]
+  from = "/reality"
+  to = "/reality.html"
+  status = 200
+
 # キャッシュ設定: site.db(SQLite)は300秒。HTML/CSS/JSはファイル名固定のため
 # 毎回サーバに確認(未変更は304で軽量、変更時は即反映)させる。
 [[headers]]

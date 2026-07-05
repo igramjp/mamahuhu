@@ -19,6 +19,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://mamahuhu.app/reality</loc>
+    <lastmod>2026-07-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://mamahuhu.app/about</loc>
     <lastmod>2026-07-04</lastmod>
     <changefreq>yearly</changefreq>
