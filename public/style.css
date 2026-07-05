@@ -62,12 +62,10 @@ header {
     overflow: hidden;
     position: relative;
     width: 100%;
-    height: 88px;
+    height: auto;
     background: transparent;
     color: #2f2f2f;
-    padding: 0 22px;
-    display: flex;
-    align-items: center;
+    padding: 14px 22px 12px;
 }
 
 header h1 {
@@ -1419,10 +1417,11 @@ table.data-table.pred-table thead tr th:not(:first-child):not(:nth-child(2)) {
     padding: 0 6px;
 }
 
-/* ===== ヘッダーナビ ===== */
+/* ===== ヘッダーナビ(ロゴ下・本文と同じ660pxカラム) ===== */
 .header-nav {
     max-width: 660px;
-    margin: 14px auto 0;
+    margin: 12px auto 0;
+    justify-content: flex-start;
     gap: 6px 1.7em;
 }
 
@@ -1446,17 +1445,7 @@ table.data-table.pred-table thead tr th:not(:first-child):not(:nth-child(2)) {
 }
 
 @media (max-width: 700px) {
-    /* ヘッダーを縦積みにしてナビをロゴ下へ */
-    header {
-        height: auto;
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 10px 22px 12px;
-    }
-
     .header-nav {
-        justify-content: flex-start;
-        margin: 6px 0 0;
         gap: 4px 1.3em;
     }
 }
