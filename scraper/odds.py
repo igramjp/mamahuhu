@@ -104,6 +104,16 @@ def fetch_shutuba(race_id):
 
     name_el = soup.select_one(".RaceName")
     race_name = name_el.get_text(strip=True) if name_el else None
+    # グレード: レース名横のアイコン(Icon_GradeType1/2/3 = G1/G2/G3)。
+    # 出馬表のレース名文字列には(GIII)等が入らないため、ここで拾うしかない
+    grade = None
+    icon = soup.select_one(".RaceName [class*='Icon_GradeType']")
+    if icon:
+        for cls in icon.get("class") or []:
+            m = re.fullmatch(r"Icon_GradeType([123])", cls)
+            if m:
+                grade = f"G{m.group(1)}"
+                break
     info = soup.select_one("div.RaceData01")
     text = info.get_text(" ", strip=True) if info else ""
     if "障" in text:               # "障芝" があるので障害を先に判定
@@ -151,7 +161,7 @@ def fetch_shutuba(race_id):
             "jockey": jockey_a.get_text(strip=True) if jockey_a else None,
         })
     entries.sort(key=lambda e: e["umaban"])
-    return {"race_name": race_name, "surface": surface,
+    return {"race_name": race_name, "grade": grade, "surface": surface,
             "distance": distance, "course_setting": setting,
             "entries": entries}
 
@@ -189,6 +199,7 @@ def snapshot_date(yyyymmdd):
             race = {
                 "race_id": rid, "date": yyyymmdd, "place": place,
                 "race_no": int(rid[10:12]), "race_name": meta["race_name"],
+                "grade": meta["grade"],
                 "surface": meta["surface"], "distance": meta["distance"],
                 "course_setting": meta["course_setting"],
                 "snapped_at": snapped,

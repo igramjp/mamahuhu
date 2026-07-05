@@ -1406,3 +1406,15 @@ table.data-table.pred-table thead tr th:not(:first-child):not(:nth-child(2)) {
     color: #767676;
     line-height: 1.5;
 }
+
+/* 重賞タグ(G1/G2/G3) */
+.grade-tag {
+    display: inline-block;
+    font-size: 0.7em;
+    font-weight: 700;
+    color: #fff;
+    background: #8a6d3b;
+    border-radius: 3px;
+    line-height: 1.6;
+    padding: 0 6px;
+}

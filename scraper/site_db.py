@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS pred_races (
     snapped_at TEXT,             -- forward=1のオッズ取得時点(鮮度表示用)
     analysis TEXT,               -- 判定根拠JSON {deviations, beta, ev_threshold,
                                  --   overround, max_ev, max_ev_umaban, prev_date, ...}
+    grade TEXT,                  -- G1/G2/G3(平場はNULL)。重賞は全頭を保存・表示
     PRIMARY KEY (date, place, race_no)
 );
 
@@ -123,6 +124,8 @@ MIGRATIONS = [
      "ALTER TABLE pred_races ADD COLUMN analysis TEXT"),
     ("pred_horses", "frame3",
      "ALTER TABLE pred_horses ADD COLUMN frame3 TEXT"),
+    ("pred_races", "grade",
+     "ALTER TABLE pred_races ADD COLUMN grade TEXT"),
 ]
 
 TABLES = ["reports", "notable_races", "notable_entries",
@@ -256,11 +259,12 @@ def write_predictions(conn, date, place, races, forward=False):
         for r in races:
             analysis = r.get("analysis")
             conn.execute(
-                "INSERT INTO pred_races VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO pred_races VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (date, place, r["race_no"], r.get("race_name"), r.get("surface"),
                  r.get("distance"), r["verdict"], r.get("model_version"),
                  1 if forward else 0, r.get("snapped_at"),
-                 json.dumps(analysis, ensure_ascii=False) if analysis else None))
+                 json.dumps(analysis, ensure_ascii=False) if analysis else None,
+                 r.get("grade")))
             for h in r.get("horses") or []:
                 conn.execute(
                     "INSERT INTO pred_horses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",

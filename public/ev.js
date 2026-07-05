@@ -17,11 +17,13 @@ function formatDateWithDow(yyyymmdd) {
   return `${yyyy}/${String(mm).padStart(2, "0")}/${String(dd).padStart(2, "0")}(${dow})`;
 }
 
-function horseRows(horses, expanded) {
-  // 展開時: 推奨・注目+上位3頭。折りたたみ: 上位3頭。
-  const shown = expanded
-    ? horses.filter((h) => h.recommended || h.attention || horses.indexOf(h) < 3)
-    : horses.slice(0, 3);
+function horseRows(horses, expanded, showAll) {
+  // 全頭(重賞): 保存済みの全行。展開時: 推奨・注目+上位3頭。折りたたみ: 上位3頭。
+  const shown = showAll
+    ? horses
+    : expanded
+      ? horses.filter((h) => h.recommended || h.attention || horses.indexOf(h) < 3)
+      : horses.slice(0, 3);
   let rows = "";
   for (const h of shown) {
     const evCls = h.ev >= 1.1 ? "ev-hot" : h.ev >= 0.9 ? "ev-warm" : "";
@@ -80,24 +82,29 @@ function basisHtml(r) {
 function raceCard(r) {
   const meta = SURFACE_META[r.surface] || { cls: "" };
   const isReco = r.verdict === "推奨";
+  const isGraded = !!r.grade;
   const hasAttn = r.horses.some((h) => h.attention);
   const verdictChip = isReco
     ? '<span class="verdict-chip verdict-reco">推奨あり</span>'
     : '<span class="verdict-chip verdict-pass">見送り</span>';
   const attnChip = hasAttn
     ? '<span class="verdict-chip verdict-attn">注目</span>' : "";
+  const gradeChip = isGraded
+    ? `<span class="grade-tag">${r.grade}</span>` : "";
 
   const head = `<div class="pred-race-head">
       <span class="race-no-tag">${r.race_no}R</span>
+      ${gradeChip}
       <span class="pred-race-name">${r.race_name || ""}</span>
       <span class="surface-tag-mini ${meta.cls}">${r.surface}${r.distance || ""}m</span>
       ${verdictChip}${attnChip}
     </div>`;
 
-  const expanded = isReco || hasAttn;
+  // 重賞(G1-G3)は見送りでも全頭を常時表示する
+  const expanded = isReco || hasAttn || isGraded;
   const table = `<table class="data-table pred-table"><thead><tr>
       <th>馬番</th><th>馬名</th><th>単勝オッズ</th><th>市場確率</th><th>モデル確率</th><th>期待値</th>
-    </tr></thead><tbody>${horseRows(r.horses, expanded)}</tbody></table>`;
+    </tr></thead><tbody>${horseRows(r.horses, expanded, isGraded)}</tbody></table>`;
   const body = table + basisHtml(r);
 
   if (expanded) {

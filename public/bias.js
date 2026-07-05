@@ -176,7 +176,6 @@ function evConnectionHtml() {
       ${intro}
       <p class="reality-lead">直近の期待値分析(${formatDateWithDow(latest.date)})の答えは<b>ノー</b> — 推奨0レース。${cum}${attn}</p>
       <p class="yomi-foot">つまり、このページで観測される枠順バイアスは実在するが、その大半はすでにオッズに織り込まれており、控除率(約20%)の壁を超える余地を残していない。バイアスの検証記録と、それが馬券のプラスに変わらないという検証結果を、両方そのまま公開している。</p>
-      <div class="link-button"><a href="index.html"><span>期待値分析を見る</span></a></div>
     </section>`;
   }
 
@@ -208,7 +207,6 @@ function evConnectionHtml() {
       <th>レース</th><th>推奨馬(枠位置)</th><th>オッズ</th><th>市場→モデル</th><th>期待値</th><th>使用した乖離</th>
     </tr></thead><tbody>${rows}</tbody></table>
     <p class="yomi-foot">推奨は「前開催で観測した枠位置グループの乖離が、オッズに織り込まれていない」とモデルが判断した稀なケース。詳細な判定の内訳は期待値分析ページの各レース欄。</p>
-    <div class="link-button"><a href="index.html"><span>期待値分析で詳細を見る</span></a></div>
   </section>`;
 }
 

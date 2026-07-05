@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS forward_races (
     place      TEXT NOT NULL,
     race_no    INTEGER,
     race_name  TEXT,
+    grade      TEXT,               -- G1/G2/G3 (出馬表アイコンより。平場はNULL)
     surface    TEXT,               -- 芝/ダート/障害
     distance   INTEGER,
     course_setting TEXT,           -- 柵設定 A/B/C/D (出馬表RaceData01より)
@@ -153,6 +154,10 @@ def connect(db_path=None):
         with conn:
             conn.execute(
                 "ALTER TABLE forward_races ADD COLUMN course_setting TEXT")
+    # forward_races.grade (2026-07-05追加、G3以上の全頭表示用)
+    if fcols and "grade" not in fcols:
+        with conn:
+            conn.execute("ALTER TABLE forward_races ADD COLUMN grade TEXT")
     return conn
 
 
@@ -177,7 +182,7 @@ def upsert_race(conn, race, results):
 
 
 FWD_RACE_COLS = ["race_id", "date", "place", "race_no", "race_name",
-                 "surface", "distance", "course_setting", "snapped_at"]
+                 "grade", "surface", "distance", "course_setting", "snapped_at"]
 FWD_ENTRY_COLS = ["race_id", "umaban", "wakuban", "horse", "jockey",
                   "win_odds", "popularity", "snapped_at"]
 
