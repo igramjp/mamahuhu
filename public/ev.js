@@ -103,7 +103,7 @@ function raceCard(r) {
   // 重賞(G1-G3)は見送りでも全頭を常時表示する
   const expanded = isReco || hasAttn || isGraded;
   const table = `<table class="data-table pred-table"><thead><tr>
-      <th>馬番</th><th>馬名</th><th>単勝オッズ</th><th>市場確率</th><th>モデル確率</th><th>期待値</th>
+      <th>馬番</th><th>馬名</th><th>単勝</th><th>市場確率</th><th>モデル確率</th><th>期待値</th>
     </tr></thead><tbody>${horseRows(r.horses, expanded, isGraded)}</tbody></table>`;
   const body = table + basisHtml(r);
 
