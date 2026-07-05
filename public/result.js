@@ -58,7 +58,7 @@ function raceRow(r) {
   }
 
   const table = `<table class="data-table pred-table"><thead><tr>
-      <th>馬番</th><th>馬名</th><th>単勝オッズ</th><th>区分</th><th>結果</th>
+      <th>馬番</th><th>馬名</th><th>単勝</th><th>区分</th><th>結果</th>
     </tr></thead><tbody>${r.horses.map(horseRow).join("")}</tbody></table>`;
   return `<div class="pred-race pred-race-open">${head}${table}</div>`;
 }
