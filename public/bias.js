@@ -103,12 +103,11 @@ function distTable(byDistance) {
     rows += `<tr>
       <td class="dist-cat-cell">${cat}<small> ${h.frame && h.frame.groups[0] ? sumN(h.frame.groups) : "-"}頭</small></td>
       ${cell(h, "frame", "内")}${cell(h, "frame", "中")}${cell(h, "frame", "外")}
-      ${cell(h, "style", "逃げ先行")}${cell(h, "style", "差し追込")}
     </tr>`;
   }
   return `<h3 class="sub-head">距離カテゴリ別の乖離Δ</h3>
     <table class="data-table dist-table"><thead><tr>
-      <th>距離帯</th><th>内</th><th>中</th><th>外</th><th>逃先</th><th>差追</th>
+      <th>距離帯</th><th>内</th><th>中</th><th>外</th>
     </tr></thead><tbody>${rows}</tbody></table>
     <p class="yomi-foot-min">距離帯別は標本が小さく縮小推定が強く効くため、保守的(ベースライン寄り)な値になる。</p>`;
 }
@@ -127,11 +126,9 @@ function surfaceBlockHtml(place, surface, b3s, notes) {
       <div class="dev-meter">${b3s.frame.groups.map(devMeterRow).join("")}</div>
       ${confidenceLine(b3s.frame.meta)}`;
   }
-  if (b3s.style) {
-    html += `<h3 class="sub-head">脚質バイアス</h3>
-      <div class="dev-meter">${b3s.style.groups.map(devMeterRow).join("")}</div>
-      ${confidenceLine(b3s.style.meta)}`;
-  }
+  // 脚質バイアスは表示を停止中(2026-07-05)。モデル未使用(検証で死に筋)かつ
+  // 通過順位が火曜のdb取り込みまで入らず直近開催分を出せないため。
+  // 集計自体は bias3_stats(kind='style') に継続して残している。
 
   html += distTable(b3s.byDistance || {});
 
