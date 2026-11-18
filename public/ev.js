@@ -17,6 +17,20 @@ function formatDateWithDow(yyyymmdd) {
   return `${yyyy}/${String(mm).padStart(2, "0")}/${String(dd).padStart(2, "0")}(${dow})`;
 }
 
+// 馬名の折り返し位置を中央付近の1か所に限定する(CSS側で word-break: keep-all)。
+// 狭い画面で「ウインブリー/ズ」のように末尾1文字だけ次行に落ちるのを防ぐ。
+// 小書きの仮名・長音が行頭に来る位置は避ける。
+const NO_LINE_START = "ァィゥェォッャュョヮヵヶー";
+function nameHtml(name) {
+  if (!name) return "";
+  const ch = [...name];
+  if (ch.length < 5) return `<span class="horse-name-text">${name}</span>`;
+  const mid = Math.ceil(ch.length / 2);
+  const at = [mid, mid + 1, mid - 1].find(
+    (i) => i >= 2 && i <= ch.length - 2 && !NO_LINE_START.includes(ch[i])) ?? mid;
+  return `<span class="horse-name-text">${ch.slice(0, at).join("")}<wbr>${ch.slice(at).join("")}</span>`;
+}
+
 function horseRows(horses, expanded, showAll) {
   // 全頭(重賞): 保存済みの全行。展開時: 推奨・注目+上位3頭。折りたたみ: 上位3頭。
   const shown = showAll
@@ -34,7 +48,7 @@ function horseRows(horses, expanded, showAll) {
       (h.attention ? `<span class="chip chip-attn reco-chip">注目 市場比+${(h.edge * 100).toFixed(1)}%</span>` : "");
     rows += `<tr class="${h.recommended ? "reco-row" : h.attention ? "attn-row" : ""}">
       <td class="horse-num-cell"><span class="horse-num">${h.umaban}</span></td>
-      <td class="horse-name-cell">${h.horse || ""}${frame}${chips}</td>
+      <td class="horse-name-cell">${nameHtml(h.horse)}${frame}${chips}</td>
       <td class="num-cell">${h.odds ?? "-"}</td>
       <td class="num-cell">${pctP(h.market_prob)}</td>
       <td class="num-cell">${pctP(h.model_prob)}</td>
