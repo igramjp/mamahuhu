@@ -39,6 +39,7 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scraper"))
 from predict import (BETA, EV_THRESHOLD, MODEL_VERSION,  # noqa: E402
                      build_forward_predictions)
+from target_dates import preview_dates  # noqa: E402
 
 # ---------- 定数 ----------
 JST = timezone(timedelta(hours=9))
@@ -517,7 +518,12 @@ def main() -> int:
     if args.verify:
         return run_verify(now_dt, dry_run)
 
-    target_dt = now_dt + timedelta(days=1)  # 翌日(=投稿対象)のレース
+    # 投稿対象 = これから発走する次の日。「実行時点の翌日」にはしない:
+    # cronが数時間遅れて金曜20時のジョブが土曜未明に走ると、翌日=日曜に
+    # なってしまうため(2026-11実測)。9時より前に走ったら当日が対象。
+    target_ymd, src_ymd = preview_dates(now_dt)
+    target_dt = datetime.strptime(target_ymd, "%Y%m%d").replace(tzinfo=JST)
+    src_dt = datetime.strptime(src_ymd, "%Y%m%d").replace(tzinfo=JST)
     log.info(
         "now=%s (%s) target=%s",
         now_dt.strftime("%Y-%m-%d %H:%M"),
@@ -563,14 +569,13 @@ def main() -> int:
     )
 
     # 2. 開催中の全競馬場のバイアスデータを取得 (キャッシュ)
-    #    - 金曜投稿(=土曜レース): 先週日曜のJSON (今日から5日前)
-    #    - それ以外(土曜投稿=日曜レース): 当日(土曜)のJSON
-    #    404 ならスキップ。フォールバックなし。
-    is_friday = now_dt.weekday() == 4
-    src_dt = now_dt - timedelta(days=5) if is_friday else now_dt
+    #    - 土曜レース(金曜投稿): 先週日曜の分析 (対象日の6日前)
+    #    - それ以外(土曜投稿=日曜レース): 対象日の前日の分析
+    #    実行した曜日ではなく対象日から決める(preview_dates)。
+    #    データなしならスキップ。フォールバックなし。
     log.info(
         "バイアスデータソース: %s (%s)",
-        "先週日曜" if is_friday else "当日",
+        "先週日曜" if target_dt.weekday() == 5 else "対象日の前日",
         src_dt.strftime("%Y-%m-%d"),
     )
     data_cache: dict[str, dict] = {}

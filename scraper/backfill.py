@@ -28,7 +28,7 @@ import argparse
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import requests
 from bs4 import BeautifulSoup
@@ -36,6 +36,7 @@ from bs4 import BeautifulSoup
 import db
 import payouts as payouts_mod
 from scrape import COURSE, HEADERS, _extract_race_table, decode_html
+from target_dates import jst_today
 
 CODE_TO_PLACE = {v: k for k, v in COURSE.items()}
 
@@ -52,9 +53,6 @@ BLOCK_STATUSES = {403, 429}
 # 開催なし(0件)をキャッシュしない直近日数。db側への反映前に一覧が空だった日を
 # 「開催なし」と確定させてしまうと、以後ずっとスキップされるため。
 RECENT_DAYS = 7
-
-JST = timezone(timedelta(hours=9))  # 日本は夏時間なし
-
 
 class BlockedError(Exception):
     """レート制限/ブロック(HTTP 403/429、または netkeiba 以外の応答)。"""
@@ -73,13 +71,6 @@ class BackfillAborted(Exception):
 
 
 # ---------- 日付(JST) ----------
-def jst_today(now=None):
-    """JSTでの今日。now はテスト用(tz付きdatetime)。
-    GHAランナーはUTCで、date.today() だと日本時間0〜9時に前日を返す。"""
-    now = now or datetime.now(timezone.utc)
-    return now.astimezone(JST).date()
-
-
 def default_to(now=None):
     """--to の既定値 = JSTの今日。
     旧既定の「4日前」は火曜実行だと金曜止まりで、取り込みたい直前の土日が

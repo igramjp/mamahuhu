@@ -17,20 +17,21 @@ GitHub Actions想定: 金曜18時(翌土曜ぶん)・土日18時(翌日ぶん)�
 月曜開催なし等でレースが見つからない日は何もせず正常終了する。
 
 使い方:
-  python scraper/odds.py                 # 翌日(JST)
+  python scraper/odds.py                 # 次の開催日(JST 9時前は当日、以降は翌日)
   python scraper/odds.py --date 20260711
 """
 
 import argparse
 import re
 import time
-from datetime import date, datetime, timedelta
+from datetime import datetime
 
 import requests
 from bs4 import BeautifulSoup
 
 import db as keiba_db
 from scrape import COURSE, HEADERS
+from target_dates import forward_date
 
 ODDS_API = "https://race.netkeiba.com/api/api_get_jra_odds.html"
 SLEEP_BETWEEN_RACES = 1.5
@@ -217,9 +218,10 @@ def snapshot_date(yyyymmdd):
 def main():
     ap = argparse.ArgumentParser(description="発走前オッズスナップショット")
     ap.add_argument("--date", default=None,
-                    help="対象日 YYYYMMDD (既定: 翌日JST)")
+                    help="対象日 YYYYMMDD (既定: これから発走する次の日。"
+                         "JST 9時より前なら当日、以降は翌日)")
     args = ap.parse_args()
-    target = args.date or (date.today() + timedelta(days=1)).strftime("%Y%m%d")
+    target = args.date or forward_date()
     print(f"発走前オッズスナップショット: {target}")
     n = snapshot_date(target)
     print(f"完了: {n}R")
