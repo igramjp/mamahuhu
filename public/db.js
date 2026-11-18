@@ -138,8 +138,8 @@
   // pred_horses.rank(確定着順)が入っている日が検証可能。
   // 推奨馬の的中 = rank=1(単勝ベット)。2-3着は参考情報。
   function verifyDates() {
-    // 結果(確定着順)が入っている日 = 検証可能。全レース見送りの日も
-    // 「見送り判断の記録」として表示対象に含める。
+    // 結果(確定着順)が入っている日 = 検証可能。基準に届く馬がいなかった日も
+    // 「どこまで届かなかったか」の記録として表示対象に含める。
     return rows(
       `SELECT DISTINCT date FROM pred_horses
        WHERE rank IS NOT NULL
@@ -151,6 +151,7 @@
     const places = [];
     const total = { n_races: 0, n_reco_races: 0, n_reco: 0, n_hit: 0, payout: 0,
                     n_attn: 0, n_attn_hit: 0, attn_payout: 0 };
+    let dayBest = null;  // その日で最も基準に近かった1頭
 
     for (const p of rows(
       `SELECT DISTINCT place FROM pred_races WHERE date = ? ORDER BY place`,
@@ -170,6 +171,15 @@
           surface: r.surface, distance: r.distance,
           verdict: r.verdict, horses: [],
         };
+        // レース内で最も基準(期待値1.1)に近かった馬と、その着順
+        const b = rows(
+          `SELECT ev, umaban, horse, rank FROM pred_horses
+           WHERE date = ? AND place = ? AND race_no = ?
+           ORDER BY ev DESC, umaban LIMIT 1`, [targetDate, place, r.race_no])[0];
+        race.best = b || null;
+        if (b && (!dayBest || b.ev > dayBest.ev)) {
+          dayBest = { ...b, place, race_no: r.race_no };
+        }
         if (r.verdict === "推奨") {
           sum.n_reco_races++;
           for (const h of rows(
@@ -189,7 +199,7 @@
             });
           }
         }
-        // 注目馬(推奨とは別ティア): 見送りレースにも付きうる
+        // 注目馬(推奨とは別ティア): 基準に届かないレースにも付きうる
         for (const h of rows(
           `SELECT * FROM pred_horses
            WHERE date = ? AND place = ? AND race_no = ?
@@ -222,7 +232,7 @@
     };
     withRoi(total);
     for (const pl of places) withRoi(pl.summary);
-    return { date: targetDate, places, total };
+    return { date: targetDate, places, total, best: dayBest };
   }
 
   // ---- 予想(pred_*) ----
@@ -276,7 +286,11 @@
          WHERE date = ? AND place = ? AND race_no = ? AND recommended = 1
          ORDER BY ev DESC`, [d.d, r.place, r.race_no]);
     }
-    return { date: d.d, races };
+    // その日の最大期待値(バイアスページで「どこまで届かなかったか」を示す)
+    const best = rows(
+      `SELECT ev, place, race_no, umaban, horse FROM pred_horses
+       WHERE date = ? ORDER BY ev DESC LIMIT 1`, [d.d])[0] || null;
+    return { date: d.d, races, best };
   }
 
   function predictions(date, place) {

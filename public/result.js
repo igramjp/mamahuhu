@@ -1,5 +1,7 @@
 // 結果検証 - frontend renderer
-// 推奨馬(単勝)の的中と回収率を検証する。見送りレースは見送りとして記録。
+// 推奨馬(単勝)の的中と回収率を検証する。基準(期待値1.1)に届く馬がいない
+// レースは、最も基準に近かった馬の期待値と着順を記録する。
+const EV_THRESHOLD = 1.1;
 const $ = (s, r = document) => r.querySelector(s);
 
 const SURFACE_META = {
@@ -40,6 +42,15 @@ function horseRow(h) {
   </tr>`;
 }
 
+// 基準に届かなかったレース: 「見送り」の一語ではなく、最も基準に近かった馬が
+// どこまで届き、何着だったかを出す
+function bestChip(b) {
+  if (!b) return '<span class="verdict-chip verdict-pass">基準未満</span>';
+  const rank = b.rank ? `・${b.rank}着` : "";
+  const who = `${b.umaban}番${b.horse ? " " + b.horse : ""}`;
+  return `<span class="verdict-chip verdict-pass" title="最も基準(期待値${EV_THRESHOLD})に近かった馬: ${who}">最大期待値 ${b.ev.toFixed(2)}${rank}</span>`;
+}
+
 function raceRow(r) {
   const meta = SURFACE_META[r.surface] || { cls: "" };
   const hasAttn = r.horses.some((h) => h.kind === "注目");
@@ -49,7 +60,7 @@ function raceRow(r) {
       <span class="surface-tag-mini ${meta.cls}">${r.surface}${r.distance || ""}m</span>
       ${r.verdict === "推奨"
         ? '<span class="verdict-chip verdict-reco">推奨</span>'
-        : '<span class="verdict-chip verdict-pass">見送り</span>'}
+        : bestChip(r.best)}
       ${hasAttn ? '<span class="verdict-chip verdict-attn">注目</span>' : ""}
     </div>`;
 
@@ -72,11 +83,22 @@ function summaryHtml(s, label) {
   </div>`;
 }
 
+function subText(data) {
+  const b = data.best;
+  const bestText = b
+    ? `最も基準に近かったのは${b.place}${b.race_no}R ${b.umaban}番${b.horse ? " " + b.horse : ""}の期待値<b>${b.ev.toFixed(2)}</b>${b.rank ? `(結果${b.rank}着)` : ""}。`
+    : "";
+  if (data.total.n_reco === 0) {
+    return `この日、期待値が基準${EV_THRESHOLD}に届いた馬はいません(推奨0頭のため、推奨の回収率はありません)。<br>${bestText}各レースには、最も基準に近かった馬の期待値と着順を記録しています。`;
+  }
+  return `基準(期待値${EV_THRESHOLD})を超えた推奨馬を単勝100円で均等買いした場合の検証。<br>基準に届かなかったレースは賭けていないため回収率に影響しません。${bestText}`;
+}
+
 function renderVerify(data) {
   const root = $("#report");
   let html = `<section class="section panel">
     <h2 class="section-head">検証サマリ</h2>
-    <p class="section-sub">推奨馬を単勝100円で均等買いした場合の検証。<br>見送りレースは賭けていないため回収率に影響しません。</p>
+    <p class="section-sub">${subText(data)}</p>
     ${summaryHtml(data.total)}
   </section>`;
 

@@ -163,15 +163,19 @@ function evConnectionHtml() {
 
   if (!latest.races.length) {
     const cum = t && t.n_races
-      ? `2024年1月以降の累計では、${t.n_races.toLocaleString()}レースを検証して期待値1.1を超えた推奨は<b>${t.n_reco_races}件</b>。`
+      ? `2024年1月以降の累計では、${t.n_races.toLocaleString()}レースを検証して期待値1.1を超えた推奨は<b>${t.n_reco_races}件</b>${stats.best ? `(過去最大の期待値は${stats.best.ev.toFixed(2)})` : ""}。`
       : "";
+    const b = latest.best;
+    const dayBest = b
+      ? `最も基準に近いのは${b.place}${b.race_no}R ${b.umaban}番${b.horse ? " " + b.horse : ""}の期待値<b>${b.ev.toFixed(2)}</b>で、基準1.1に届く馬なし。`
+      : "基準1.1に届く馬なし。";
     const attn = stats.attn && stats.attn.n
       ? `モデルが市場より高く評価した「注目馬」${stats.attn.n}頭の実測単勝回収率は<b>${stats.attn.roi.toFixed(0)}%</b>(損益分岐は100%)。`
       : "";
     return `<section class="section panel reality-panel">
       <h2 class="section-head">このバイアスは、儲けに変わるか</h2>
       ${intro}
-      <p class="reality-lead">直近の期待値分析(${formatDateWithDow(latest.date)})の答えは<b>ノー</b> — 推奨0レース。${cum}${attn}</p>
+      <p class="reality-lead">直近の期待値分析(${formatDateWithDow(latest.date)})の答えは<b>ノー</b> — ${dayBest}${cum}${attn}</p>
       <p class="yomi-foot">つまり、このページで観測される枠順バイアスは実在するが、その大半はすでにオッズに織り込まれており、控除率(約20%)の壁を超える余地を残していない。バイアスの検証記録と、それが馬券のプラスに変わらないという検証結果を、両方そのまま公開している。</p>
     </section>`;
   }
