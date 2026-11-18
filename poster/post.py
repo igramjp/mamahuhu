@@ -6,7 +6,7 @@ mamahuhu X auto-poster
   scraper/odds.py が18時に保存した前日オッズスナップショット(keiba.dbの
   forward_*)があれば、順方向の実EVで結論を出し注目馬の実名も載せる。
   スナップショットが無い場合は従来どおり、オッズに依らない期待値上界の
-  判定で「見送り」をリークなしで宣言する(上界が閾値以上ならスキップ+警告)。
+  判定で「基準に届く馬なし」をリークなしで宣言する(上界が閾値以上ならスキップ+警告)。
 
 ■ 結果検証ポスト(火 20:00 JST, --verify)
   直近週末の判断(見送り/推奨)と検証(的中・回収率・全馬ベット基準)を投稿。
@@ -319,40 +319,68 @@ def tweet_weight(text: str) -> int:
     return sum(1 if ord(c) < 0x1100 else 2 for c in text)
 
 
+def cumulative_line() -> str:
+    """常設の事実: 確定オッズ版の全レースで基準を超えた回数(site.dbから)。
+    読めない場合は空文字(投稿は続行)。"""
+    try:
+        n, n_reco, d_from = _site_db().execute(
+            "SELECT COUNT(*), COALESCE(SUM(verdict = '推奨'), 0), MIN(date)"
+            " FROM pred_races WHERE forward = 0").fetchone()
+    except Exception as e:
+        log.warning("累計統計の取得失敗: %s", e)
+        return ""
+    if not n:
+        return ""
+    return f"{d_from[:4]}年以降{n:,}レースで基準超えは{n_reco}回です。"
+
+
 def compose_pass_tweet(race_name: str, memo: str,
-                       attention: dict | None = None) -> str:
-    """前日ポスト(見送り)。分析レポート調。
-    attention: 注目馬(predict.pyのhorse dict)。前日オッズがある時だけ渡される。
-    期待値プラスを意味しない相対シグナルである旨を必ず添える(サイトと同じ整理)。"""
+                       best: dict | None = None,
+                       bound: float | None = None,
+                       cumulative: str = "") -> str:
+    """前日ポスト(基準に届く馬なし)。分析レポート調。
+    毎回同じ「見送り」の一語ではなく、最も基準に近い馬がどこまで届いたかを
+    数字で出す。
+    best: レース内で期待値最大の馬(predict.pyのhorse dict)。前日オッズがある時。
+    bound: 前日オッズが無い時の、オッズに依らない期待値の上界。
+    期待値プラスを意味しない旨は「基準に届く馬なし」で必ず明示する。"""
     hashtag = race_name_to_hashtag(race_name)
-    att_lines = []
-    if attention and attention.get("horse"):
-        att_lines = [
-            f"注目馬: {attention['horse']}(前日オッズ{attention['odds']}倍・"
-            f"市場比+{round(attention['edge'] * 100)}%評価。"
-            "期待値プラスの水準ではありません)",
-            "",
-        ]
+    if best and best.get("horse"):
+        detail = (f"最大期待値 {best['ev']:.2f} = {best['horse']}"
+                  f"(前日オッズ{best['odds']}倍)")
+        short = f"最大期待値 {best['ev']:.2f}({best['horse']})"
+    elif bound is not None:
+        detail = f"期待値の上限 {bound:.2f}(オッズがいくらでもこれ以下)"
+        short = f"期待値の上限 {bound:.2f}"
+    else:
+        detail = short = ""
     lines = [
         f"#{hashtag} の期待値分析",
         "",
-        "結論: 見送り",
-        f"オッズとモデルの見解差が基準(期待値{EV_THRESHOLD})に届く馬はいません。",
+        f"結論: 基準{EV_THRESHOLD}に届く馬なし",
+        detail,
+        cumulative,
         "",
-        *att_lines,
         memo,
         "",
         "全レースの分析はプロフィールのリンクから",
     ]
-    body = "\n".join(lines)
+
+    def join(ls):
+        return re.sub(r"\n{3,}", "\n\n", "\n".join(l for l in ls if l is not None))
+
+    lines = [l for i, l in enumerate(lines) if l != "" or lines[i - 1] != ""]
+    body = join(lines)
     if tweet_weight(body) > TWEET_LIMIT:
         # 長すぎる場合は馬場メモを落とす
-        body = "\n".join(l for l in lines if l != memo)
-    if tweet_weight(body) > TWEET_LIMIT and attention:
-        # それでも長い場合は注目馬の説明を名前だけに短縮
-        short = f"注目馬: {attention['horse']}(期待値プラスの水準ではありません)"
-        body = body.replace(att_lines[0], short)
-    return re.sub(r"\n{3,}", "\n\n", body)
+        lines = [l for l in lines if l != memo]
+        body = join(lines)
+    if tweet_weight(body) > TWEET_LIMIT and cumulative:
+        lines = [l for l in lines if l != cumulative]
+        body = join(lines)
+    if tweet_weight(body) > TWEET_LIMIT and detail != short:
+        body = body.replace(detail, short)
+    return body
 
 
 def compose_reco_tweet(race_name: str, recos: list[dict], memo: str) -> str:
@@ -377,12 +405,17 @@ def compose_reco_tweet(race_name: str, recos: list[dict], memo: str) -> str:
 
 def compose_verify_tweet(dates: list[str], n_races: int, n_reco: int,
                          n_hit: int, roi: float | None,
-                         bench_roi: float) -> str:
+                         bench_roi: float,
+                         best: tuple | None = None) -> str:
     """結果検証ポスト(火曜)。"""
     labels = "・".join(f"{int(d[4:6])}/{int(d[6:8])}" for d in dates)
     lines = [f"週末の結果検証({labels})", ""]
     if n_reco == 0:
-        lines.append(f"判断: 全{n_races}レースを見送り")
+        lines.append(f"判断: 全{n_races}レースで基準{EV_THRESHOLD}に届く馬なし")
+        if best:
+            ev, place, race_no, horse, rank = best
+            res = f"・結果{rank}着" if rank else ""
+            lines.append(f"最大期待値は{ev:.2f}({place}{race_no}R {horse}{res})")
     else:
         lines.append(f"判断: 推奨{n_reco}頭(他は見送り)")
         lines.append(
@@ -462,7 +495,14 @@ def run_verify(now_dt: datetime, dry_run: bool) -> int:
     ).fetchone()
     bench_roi = (ret_all or 0) / n_all * 100 if n_all else 0.0
 
-    text = compose_verify_tweet(dates, n_races, n_reco, n_hit, roi, bench_roi)
+    # 期間内で最も基準に近かった1頭(「どれだけ届かなかったか」の開示)
+    best = site.execute(
+        f"SELECT ev, place, race_no, horse, rank FROM pred_horses"
+        f" WHERE date IN ({ph}) AND horse IS NOT NULL"
+        f" ORDER BY ev DESC LIMIT 1", dates).fetchone()
+
+    text = compose_verify_tweet(dates, n_races, n_reco, n_hit, roi, bench_roi,
+                                best=best)
     log.info("検証投稿本文(重み%d):\n%s", tweet_weight(text), text)
 
     if not dry_run:
@@ -618,14 +658,14 @@ def main() -> int:
                                   int(race["race_id"][-2:]))
             if fr:
                 recos = [h for h in fr["horses"] if h["recommended"]]
-                att = next((h for h in fr["horses"] if h["attention"]), None)
                 if recos:
                     text = compose_reco_tweet(race_name, recos, memo)
                     label = f"✅ 投稿(推奨{len(recos)}頭)"
                 else:
-                    text = compose_pass_tweet(race_name, memo, attention=att)
-                    label = ("✅ 投稿(見送り宣言+注目馬)" if att
-                             else "✅ 投稿(見送り宣言)")
+                    best = max(fr["horses"], key=lambda h: h["ev"])
+                    text = compose_pass_tweet(race_name, memo, best=best,
+                                              cumulative=cumulative_line())
+                    label = f"✅ 投稿(基準未満・最大期待値{best['ev']:.2f})"
             else:
                 # スナップショットなし: 期待値の上界がオッズに依らず閾値未満で
                 # あることを確認して見送りを宣言する(従来動作)。上界が閾値以上
@@ -639,8 +679,9 @@ def main() -> int:
                     outcomes.append((race["course"], race["grade"], race_name,
                                      f"⚠️ 要オッズ確認(上界{bound:.2f})"))
                     continue
-                text = compose_pass_tweet(race_name, memo)
-                label = "✅ 投稿(見送り宣言)"
+                text = compose_pass_tweet(race_name, memo, bound=bound,
+                                          cumulative=cumulative_line())
+                label = f"✅ 投稿(基準未満・上限{bound:.2f})"
 
             log.info("投稿本文(重み%d):\n%s", tweet_weight(text), text)
 

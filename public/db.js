@@ -248,9 +248,16 @@
       `SELECT COUNT(*) n, COALESCE(SUM(rank = 1), 0) hits,
               COALESCE(SUM(CASE WHEN rank = 1 THEN odds ELSE 0 END), 0) payout
        FROM pred_horses WHERE recommended = 1 AND rank IS NOT NULL`)[0];
+    // 確定オッズ版で過去に出た期待値の最大(「基準にどこまで近づいたか」の開示用)
+    const best = rows(
+      `SELECT h.ev, h.date, h.place, h.race_no, h.horse
+       FROM pred_horses h JOIN pred_races r
+         ON r.date = h.date AND r.place = h.place AND r.race_no = h.race_no
+       WHERE r.forward = 0 ORDER BY h.ev DESC LIMIT 1`)[0] || null;
     const roi = (s) => (s.n ? (s.payout / s.n) * 100 : null);
     return {
       total,
+      best,
       attn: { ...attn, roi: roi(attn) },
       reco: { ...reco, roi: roi(reco) },
     };
