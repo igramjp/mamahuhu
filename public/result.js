@@ -35,7 +35,7 @@ function horseRow(h) {
     : `<span class="chip chip-attn">注目${h.edge != null ? ` +${(h.edge * 100).toFixed(1)}%` : ""}</span>`;
   return `<tr class="${h.hit ? "verify-hit-row" : ""}">
     <td class="horse-num-cell"><span class="horse-num">${h.umaban}</span></td>
-    <td class="horse-name-cell">${h.horse || ""}</td>
+    <td class="horse-name-cell verify-name-cell">${h.horse || ""}</td>
     <td class="num-cell">${h.odds ?? "—"}</td>
     <td class="verify-kind-cell">${kindChip}</td>
     <td class="verify-outcome-cell">${outcomeChip(h)}</td>

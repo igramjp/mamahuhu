@@ -1209,6 +1209,27 @@ td.num-cell.dist-flat {
     }
 }
 
+/* スマホ幅: 集計タイルを2列にしてラベルの折り返し(「推奨(EV1.1/超)」)を防ぐ */
+@media (max-width: 420px) {
+    .verify-summary {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+}
+
+/* 区分・結果のチップは途中で割らない(「1着 的/中」のような折り返しを防ぐ) */
+.verify-kind-cell .chip,
+.verify-outcome-cell .chip {
+    white-space: nowrap;
+}
+
+/* 馬名が折り返す時、末尾1文字だけが次行に落ちないよう行の長さを揃える */
+/* 結果検証の表のみ。期待値分析の表は馬名セルに枠タグ・チップが同居しており、
+   行を揃えると逆に崩れるため対象外 */
+table.data-table.pred-table td.verify-name-cell {
+    text-wrap: balance;
+}
+
 
 /* ===== レポート調の微調整 ===== */
 .lede-text {
